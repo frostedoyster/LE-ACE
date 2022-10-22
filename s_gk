@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --chdir /home/bigi/radial-physics/
+#SBATCH --chdir /home/bigi/LE-ACE/
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
 #SBATCH --cpus-per-task 32
@@ -7,5 +7,5 @@
 #SBATCH --time 2-0 
 export OMP_NUM_THREADS=32
 echo STARTING AT `date`
-python gpr_LE.py
+python LE-ACE.py
 echo FINISHED at `date`

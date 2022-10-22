@@ -1,1 +1,8 @@
+__pycache__/
 datasets/
+old/
+rascaline_torch_stuff/
+splines/
+virtualenv/
+slurm*
+s_gk*
