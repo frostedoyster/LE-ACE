@@ -193,7 +193,7 @@ def write_spline(a, n_max, l_max, path):
     # Radial transform
     def radial_transform(r):
         # Function that defines the radial transform x = xi(r).
-        factor = 1.6
+        factor = 1.4
         x = a*(1.0-np.exp(-factor*np.tan(np.pi*r/(2*a))))
         return x
 

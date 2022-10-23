@@ -14,6 +14,17 @@ def sum_like_atoms(comp, invariants, species, E_nl):
     LE_reg = []
     d_features = []
   
+
+    # Contorted way of getting the force centers in order, potentially with a different number of atoms per structure:
+    if invariants[0].block(0).has_gradient("positions"):
+        structure_and_center_pairs = []
+        for center_species in species:
+            structure_and_center_pairs.append(invariants[0].block(a_i=center_species).samples[["structure", "center"]])
+        structure_and_center_pairs = np.sort(np.unique(np.concatenate(structure_and_center_pairs)))
+        unique_force_centers = [(unique_force_center[0], unique_force_center[1]) for unique_force_center in structure_and_center_pairs]
+        number_of_unique_force_centers = len(unique_force_centers)
+        force_centers_dict = {unique_force_center: j for j, unique_force_center in enumerate(unique_force_centers)}
+
     for nu_minus_one in range(len(invariants)):
         for center_species in species:
 
@@ -39,20 +50,14 @@ def sum_like_atoms(comp, invariants, species, E_nl):
             if invariant_block.has_gradient("positions"):
                 gradients = invariant_block.gradient("positions")
                 force_centers = gradients.samples[["structure", "atom"]]
-                unique_force_centers = np.unique(force_centers)
-                unique_force_centers = [(unique_force_center[0], unique_force_center[1]) for unique_force_center in unique_force_centers]  # make list of tuples which are hashable
-                force_centers_dict = {force_center: j for j, force_center in enumerate(unique_force_centers)}
-                number_of_unique_force_centers = len(unique_force_centers)
+                force_centers = [(force_center[0], force_center[1]) for force_center in force_centers]  # transform original force centers into tuples for consistency with dict
                 center_d_features = gradients.data.cpu()
                 d_features_current_center_species = torch.zeros((number_of_unique_force_centers, 3, n_features[nu_minus_one]))
-
-                force_centers = [(force_center[0], force_center[1]) for force_center in force_centers]  # transform original force centers into tuples for consistency with dict
 
                 len_grad_samples = gradients.data.shape[0]
                 for i in range(len_grad_samples):
                     d_features_current_center_species[force_centers_dict[force_centers[i]], :, :] += center_d_features[i, :, :]
-                
-                # print(d_features_current_center_species)
+
                 d_features.append(d_features_current_center_species)
 
     #comp = comp.values
