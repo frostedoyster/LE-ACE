@@ -1,0 +1,2159 @@
+Random seed: 0
+Calculating features on cpu
+Dataset path: datasets/rmd17/uracil1.extxyz
+n_elems: 4
+Number of atoms in each molecule: 12
+[0.0, 110.0, 100.0, 120.0]
+[1e+30, 3571.4165275784317, 452.25208482551375, 289.7965265818635]
+Reading dataset
+Shuffling and extracting from dataset
+Shuffling and extraction done
+All species: [1 6 7 8]
+Spherical expansion: n_max = 6, l_max = 15
+DOING TRAIN BATCH 1 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 2 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 3 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 4 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 5 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 6 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 7 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 8 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 9 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TRAIN BATCH 10 out of 10
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 1 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 2 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 3 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 4 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 5 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 6 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 7 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 8 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 9 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 10 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 11 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 12 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 13 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 14 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 15 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 16 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 17 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 18 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 19 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 20 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 21 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 22 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 23 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 24 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 25 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 26 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 27 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 28 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 29 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 30 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 31 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 32 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 33 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 34 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 35 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 36 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 37 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 38 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 39 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 40 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 41 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 42 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 43 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 44 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 45 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 46 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 47 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 48 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 49 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+DOING TEST BATCH 50 out of 50
+Calculating composition features
+Composition features done
+Calculating nu = 2 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 2 equivariants
+Calculating real CGs
+CGs finished
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+Calculating nu = 3 invariants
+Combining center species = 1
+Combining center species = 6
+Combining center species = 7
+Combining center species = 8
+nu = 1: 304
+nu = 2: 3968
+nu = 3: 39776
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+     Calculating structure features for center species 1
+     Calculating structure features for center species 6
+     Calculating structure features for center species 7
+     Calculating structure features for center species 8
+Features done
+Beginning hyperparameter optimization
+Number of features:  44049
+-13.0 5.7280704313232824e-05 22.057311139051624 14.083648217000068 0.006281787157997498 110.93702283928091 72.42677507086783
+-12.75 5.848174736853025e-05 14.528352247747847 8.898871232897044 0.006587422664073939 69.4904173967299 46.25587586992666
+-12.5 6.48022753016396e-05 11.163629108981524 6.79220865162462 0.007446257824559445 51.096686497936055 34.71206962336824
+-12.25 8.503963286076131e-05 9.816830833104099 6.115108864039183 0.009611382328166308 44.44356268295351 30.7239954881582
+-12.0 0.00013404169384710567 9.311936918455983 5.921572975762189 0.014378385519021139 42.552181001378486 29.548419618393265
+-11.75 0.0002317537769878137 9.120255629465298 5.855591124542057 0.023690573279161166 42.166681601946856 29.27848426292042
+-11.5 0.0004112181554892348 9.04645983430587 5.843207929976285 0.040685536921452395 42.1675320875157 29.255699340211475
+-11.25 0.0007305602254033773 9.01978468502783 5.847692134343088 0.07065941921654077 42.22809951974186 29.278864366230913
+-11.0 0.001289552713771508 9.016377059523695 5.85474735070765 0.12228417860267239 42.267812804904786 29.294050649088636
+-10.75 0.0022525137146580687 9.030709428530349 5.865561622582376 0.2088878692408036 42.27562726921023 29.290590436446635
+-10.5 0.0038753625824312177 9.0660298228229 5.88164601611346 0.349134392686664 42.26308447684327 29.276861455169914
+-10.25 0.0065247423567854675 9.129893773365202 5.906876094393432 0.5660530763701452 42.25982452021071 29.267510070761265
+-10.0 0.010664236175418307 9.227750041126894 5.94400954375416 0.8841515726656629 42.31821352914324 29.29208986809358
+-9.75 0.01678763688258957 9.354448386500387 5.997337976187468 1.3270990043820117 42.50653187382703 29.399057471549636
+-9.5 0.02532739336443775 9.492004256509246 6.045898932248354 1.920771832789422 42.88337451956917 29.614101324764693
+-9.25 0.036613097085026344 9.620851648106566 6.1038770897164945 2.7032116420528887 43.475182513435335 29.96378134871786
+-9.0 0.05089163782450273 9.736456195391428 6.157300863437355 3.7346857457296383 44.289515471898696 30.446076699290117
+-8.75 0.06834168108980604 9.854989879408398 6.22737713778019 5.096584094242199 45.36226531341554 31.074436490791534
+-8.5 0.08906937901707641 10.007214064910926 6.339014270193875 6.874518285705136 46.79427439015226 31.9039760743288
+-8.25 0.1130307583665209 10.231617036439733 6.52665062135458 9.136629780543945 48.73487429961319 33.06703840166896
+-8.0 0.1398115114942483 10.56523930042564 6.77485681027919 11.926699188375999 51.321730598307525 34.67757008289022
+-7.75 0.16882147612720544 11.025792944980328 7.1333799865990875 15.28025601072709 54.63189859227358 36.75400776604138
+-7.5 0.20112807431794472 11.603580931516419 7.565664428353309 19.2553450258481 58.691772353546455 39.31127603063962
+-7.25 0.2435520009130195 12.291019987821443 8.14550030105561 23.960044484266007 63.54738675022495 42.44581174127881
+-7.0 0.3134298597522334 13.133213273058988 8.904765216827393 29.56025703270324 69.33833593877618 46.278918779037866
+-6.75 0.43970154938426603 14.254437268396812 9.933981967270375 36.29799034206726 76.32913801164847 50.95497854921236
+-6.5 0.6589469054985162 15.848288155274286 11.33463652332127 44.59130336338907 84.95314341291454 56.75285127819945
+-6.25 1.0135314798769366 18.131317453429673 13.330260347887874 55.16530621835261 95.89748242418547 64.26368479160692
+-6.0 1.5572316539388553 21.24218208587722 16.028493371613322 69.00477675058777 110.05899611057539 74.2288791770221
+-5.75 2.36542807764806 25.142893627467657 19.261889713339507 87.0705885769541 128.2504770479905 87.24709482857163
+-5.5 3.539301745718614 29.665682416106694 22.986386917628348 110.05946747528054 150.94797611625535 103.68048438331657
+-5.25 5.193176291699953 34.71171982992429 26.98660825753957 138.4520678032606 178.43003152295964 123.77251930791017
+-5.0 7.4342122336599745 40.397213276758954 31.3517428618297 172.86095369135387 211.22420920819027 147.64497749121915
+-4.75 10.361061684334176 46.979326281548204 36.21384077818692 214.61884495162548 250.60735286589968 175.86218436323753
+-4.5 14.099644433871303 54.657104058059495 41.69822827163339 266.4599861179221 299.10452529084097 210.20076648097273
+-4.25 18.884971494673515 63.53113553748196 48.14652008464187 333.0448162472504 361.03881336808325 254.32792256527893
+-4.0 25.15033581729361 73.73354127474803 56.05353814526647 420.2311718276837 442.1386552307776 312.53628889438994
+-3.75 33.45193747241977 85.42902237120228 65.96330927672982 531.6291806271572 546.4215702556587 386.9598899290918
+-3.5 44.090706804013585 98.7064555639511 76.40795659255237 663.8973169376118 671.4767374682704 475.7531082039593
+-3.25 56.718406489146986 113.39068576183436 88.69203188196569 805.4859497394328 806.703586858906 571.6450490827168
+-3.0 70.41298131872186 128.70382693833272 101.81244499182701 941.3941468519381 937.3131127036504 664.2682034187461
+-11.5 5.843207929976285
+n_train: 50 n_features: 44049
+Test set RMSE (E): 9.046263580279994 [MAE (E): 5.843154417745769], RMSE (F): 42.1673969493116 [MAE (F): 29.255634640838256]

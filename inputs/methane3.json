@@ -1,0 +1,17 @@
+{
+    "random seed": 3,
+    "batch size": 500,
+    "energy conversion": "HARTREE_TO_KCAL_MOL",
+    "force conversion": "KCAL_MOL_TO_MEV",
+    "target key": "energy",
+    "dataset path": "datasets/methane.extxyz",
+    "n_test": 10000,
+    "n_train": 50000,
+    "do gradients": false, 
+    "r_cut": 6.0, 
+    "r_cut_rs": 6.0,
+    "nu_max": 4,
+    "E_max coefficients" : [0.0, 55.0, 40.0, 65.0, 85.0],
+    "optimization target": "rmse",
+    "factor for radial transform": 1.4
+}
