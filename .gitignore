@@ -1,10 +1,8 @@
 __pycache__/
 datasets/
 old/
-results/
 rascaline_torch_stuff/
 splines/
 virtualenv/
-virtualenv_f/
 slurm*
 s_gk*
