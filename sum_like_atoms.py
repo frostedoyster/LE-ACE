@@ -45,7 +45,8 @@ def sum_like_atoms(comp, invariants, species, E_nl):
                 features_current_center_species[structures[i], :] += center_features[i, :]
             features.append(features_current_center_species)
 
-            LE_reg.append(get_LE_regularization(invariant_block.properties, E_nl))
+            from LE_ACE import r_cut_rs, r_cut
+            LE_reg.append(get_LE_regularization(invariant_block.properties, E_nl, r_cut_rs, r_cut))
 
             if invariant_block.has_gradient("positions"):
                 gradients = invariant_block.gradient("positions")
@@ -59,17 +60,17 @@ def sum_like_atoms(comp, invariants, species, E_nl):
                     d_features_current_center_species[force_centers_dict[force_centers[i]], :, :] += center_d_features[i, :, :]
 
                 d_features.append(d_features_current_center_species)
-
-    #comp = comp.values
-    #LE_reg_comp = torch.tensor([0.0]*len(all_species))
-
+    """
+    comp = comp.values
+    LE_reg_comp = torch.tensor([0.0]*len(species))
+    """
     comp = torch.ones(features[0].shape[0], 1)  # MD-like
     LE_reg_comp = torch.tensor([0.0])
     if len(d_features) != 0: d_comp = torch.zeros((d_features[0].shape[0], 3, 1))
-
+    
     X = torch.concat([comp] + features, dim = -1)
     LE_reg = torch.concat([LE_reg_comp] + LE_reg, dim = -1)
-
+    
     if len(d_features) != 0: 
         dX = torch.concat([d_comp] + d_features, dim = -1)
     else:
