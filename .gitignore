@@ -6,3 +6,6 @@ splines/
 virtualenv/
 slurm*
 s_gk*
+scripts/
+outputs/
+inputs/
