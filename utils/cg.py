@@ -1,6 +1,9 @@
 import numpy as np
+import torch
 import wigners
+from collections import namedtuple
 
+SparseCGTensor = namedtuple("SparseCGTensor", "m1 m2 M cg")
 
 class ClebschGordanReal:
     def __init__(self, l1_max, l2_max, L_max=None):
@@ -45,15 +48,27 @@ class ClebschGordanReal:
                     else:
                         rcg = np.imag(real_cg)
 
-                    new_cg = []                    
+                    # Note that this construction already provides "aligned" CG 
+                    # coefficients ready to be used in the sparse accumulation package:
+
+                    m1_array = [] 
+                    m2_array = []
+                    M_array = []
+                    cg_array = []
+
                     for M in range(2 * L + 1):
-                        cg_nonzero = np.where(np.abs(rcg[:,:,M])>1e-15)                        
-                        cg_M = np.zeros( len(cg_nonzero[0]), 
-                                        dtype=[('m1','>i4'), ('m2','>i4'), ( 'cg', '>f8')] )
-                        cg_M["m1"] = cg_nonzero[0]
-                        cg_M["m2"] = cg_nonzero[1]
-                        cg_M["cg"] = rcg[cg_nonzero[0], cg_nonzero[1], M]
-                        new_cg.append(cg_M)
+                        cg_nonzero = np.where(np.abs(rcg[:,:,M]) > 1e-15)
+                        m1_array.append(cg_nonzero[0])
+                        m2_array.append(cg_nonzero[1])
+                        M_array.append(np.array([M]*len(cg_nonzero[0])))
+                        cg_array.append(rcg[cg_nonzero[0], cg_nonzero[1], M])
+
+                    m1_array = torch.LongTensor(np.concatenate(m1_array))
+                    m2_array = torch.LongTensor(np.concatenate(m2_array))
+                    M_array = torch.LongTensor(np.concatenate(M_array))
+                    cg_array = torch.tensor(np.concatenate(cg_array)).type(torch.get_default_dtype())
+
+                    new_cg = SparseCGTensor(m1_array, m2_array, M_array, cg_array)
                         
                     self._cg[(l1, l2, L)] = new_cg
 
@@ -106,64 +121,29 @@ class ClebschGordanReal:
                     else:
                         rcg = np.imag(real_cg)
 
-                    new_cg = []                    
+                    # Note that this construction already provides "aligned" CG 
+                    # coefficients ready to be used in the sparse accumulation package:
+
+                    m1_array = [] 
+                    m2_array = []
+                    M_array = []
+                    cg_array = []
+
                     for M in range(2 * L + 1):
-                        cg_nonzero = np.where(np.abs(rcg[:,:,M])>1e-15)                        
-                        cg_M = np.zeros( len(cg_nonzero[0]), 
-                                        dtype=[('m1','>i4'), ('m2','>i4'), ( 'cg', '>f8')] )
-                        cg_M["m1"] = cg_nonzero[0]
-                        cg_M["m2"] = cg_nonzero[1]
-                        cg_M["cg"] = rcg[cg_nonzero[0], cg_nonzero[1], M]
-                        new_cg.append(cg_M)
+                        cg_nonzero = np.where(np.abs(rcg[:,:,M]) > 1e-15)
+                        m1_array.append(cg_nonzero[0])
+                        m2_array.append(cg_nonzero[1])
+                        M_array.append(np.array([M]*len(cg_nonzero[0])))
+                        cg_array.append(rcg[cg_nonzero[0], cg_nonzero[1], M])
+
+                    m1_array = torch.LongTensor(np.concatenate(m1_array))
+                    m2_array = torch.LongTensor(np.concatenate(m2_array))
+                    M_array = torch.LongTensor(np.concatenate(M_array))
+                    cg_array = torch.tensor(np.concatenate(cg_array)).type(torch.get_default_dtype())
+
+                    new_cg = SparseCGTensor(m1_array, m2_array, M_array, cg_array)
                         
                     self._cg[(l1, l2, L)] = new_cg
-                    
-
-    def combine(self, rho1, rho2, L):
-        # automatically infer l1 and l2 from the size of the coefficients vectors
-        l1 = (rho1.shape[1] - 1) // 2
-        l2 = (rho2.shape[1] - 1) // 2
-        if L > self._L_max or l1 > self._l1_max or l2 > self._l2_max:
-            raise ValueError("Requested CG entry has not been precomputed")
-
-        n_items = rho1.shape[0]
-        n_features = rho1.shape[2]
-        if rho1.shape[0] != rho2.shape[0] or rho1.shape[2] != rho2.shape[2]:
-            raise IndexError("Cannot combine differently-shaped feature blocks")
-
-        rho = np.zeros((n_items, 2 * L + 1, n_features))
-        if (l1, l2, L) in self._cg:
-            for M in range(2 * L + 1):
-                for m1, m2, cg in self._cg[(l1, l2, L)][M]:
-                    rho[:, M] += rho1[:, m1, :] * rho2[:, m2, :] * cg
-
-        return rho
-
-    def combine_einsum(self, rho1, rho2, L, combination_string):
-        # automatically infer l1 and l2 from the size of the coefficients vectors
-        l1 = (rho1.shape[1] - 1) // 2
-        l2 = (rho2.shape[1] - 1) // 2
-        if L > self._L_max or l1 > self._l1_max or l2 > self._l2_max:
-            raise ValueError("Requested CG entry ", (l1, l2, L), " has not been precomputed")
-
-        n_items = rho1.shape[0]
-        if rho1.shape[0] != rho2.shape[0]:
-            raise IndexError(
-                "Cannot combine feature blocks with different number of items"
-            )
-
-        # infers the shape of the output using the einsum internals
-        features = np.einsum(combination_string, rho1[:, 0, ...], rho2[:, 0, ...]).shape
-        rho = np.zeros((n_items, 2 * L + 1) + features[1:])
-
-        if (l1, l2, L) in self._cg:
-            for M in range(2 * L + 1):
-                for m1, m2, cg in self._cg[(l1, l2, L)][M]:
-                    rho[:, M, ...] += np.einsum(
-                        combination_string, rho1[:, m1, ...], rho2[:, m2, ...] * cg
-                    )
-
-        return rho
 
 
 def _real2complex(L):

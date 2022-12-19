@@ -11,3 +11,5 @@ s_gk*
 scripts/
 outputs/
 inputs/
+venv*
+test*

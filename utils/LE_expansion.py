@@ -1,4 +1,3 @@
-import string
 import numpy as np
 import torch
 
@@ -10,7 +9,7 @@ from scipy import optimize
 from scipy.special import spherical_jn as j_l
 from scipy.special import spherical_in as i_l
 from scipy.special import spherical_yn as y_l
-from spherical_bessel_zeros import Jn_zeros
+from .spherical_bessel_zeros import Jn_zeros
 from scipy.integrate import quadrature
 
 def cut_to_LE(map: TensorMap, E_nl, E_max, all_species, device) -> TensorMap:
@@ -118,7 +117,7 @@ def process_radial_spectrum(map: TensorMap, E_nl, E_max, all_species) -> TensorM
         )
 
 
-def get_LE_expansion(structures, spline_file: string, E_nl, E_max, rcut, all_species, rs=False, do_gradients=False, device="cpu") -> TensorMap:
+def get_LE_expansion(structures, spline_file, E_nl, E_max, rcut, all_species, rs=False, do_gradients=False, device="cpu") -> TensorMap:
 
     n_max = np.where(E_nl[:, 0] <= E_max)[0][-1] + 1
     l_max = np.where(E_nl[0, :] <= E_max)[0][-1]
@@ -193,13 +192,15 @@ def write_spline(a, n_max, l_max, path):
     # Radial transform
     def radial_transform(r):
         # Function that defines the radial transform x = xi(r).
-        from LE_ACE import factor
-        x = a*(1.0-np.exp(-factor*np.tan(np.pi*r/(2*a))))
+        from LE_ACE import factor, factor2
+        # x = a*(1.0-np.exp(-factor*np.tan(np.pi*r/(2*a))))
+        x = a*(1.0-np.exp(-r/factor))*(1.0-np.exp(-(r/factor2)**2))
         return x
 
     def get_LE_radial_transform(n, l, r):
         # Calculates radially transformed LE radial basis function for a 1D array of values r.
         x = radial_transform(r)
+        from LE_ACE import factor, factor2
         return get_LE_function(n, l, x)
 
     def cutoff_function(r):

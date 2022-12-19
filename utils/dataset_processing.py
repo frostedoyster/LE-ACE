@@ -1,6 +1,7 @@
 import numpy as np
 import ase
 from ase import io
+import rascaline
 
 def get_dataset_slices(dataset_path, train_slice, test_slice):
     
@@ -46,3 +47,22 @@ def get_dataset_slices(dataset_path, train_slice, test_slice):
         print("Shuffling and extraction done")
 
     return train_structures, test_structures
+
+
+def get_minimum_distance(structures):
+
+    sd_hypers = {
+        "cutoff": 5.0,
+        "max_neighbors": 100,
+        "separate_neighbor_species": False
+    }
+    sd_calculator = rascaline.SortedDistances(**sd_hypers)
+    sds = sd_calculator.compute(structures)
+    min_distance = 10.0
+    for key, block in sds:
+        min_distance_block = np.min(np.array(block.values))
+        min_distance = min(min_distance, min_distance_block)
+    print(f"The minimum distance in the dataset is {min_distance}")
+
+    return min_distance
+

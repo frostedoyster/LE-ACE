@@ -1,4 +1,4 @@
-from LE_expansion import get_LE_expansion, write_spline
+from utils.LE_expansion import get_LE_expansion, write_spline
 
 import math
 import torch
@@ -7,16 +7,16 @@ from datetime import datetime
 import ase
 from ase import io
 
-from dataset_processing import get_dataset_slices
-from error_measures import get_rmse, get_mae
+from utils.dataset_processing import get_dataset_slices, get_minimum_distance
+from utils.error_measures import get_rmse, get_mae
 
-from composition import get_composition_features
-from lexicographic_multiplicities import apply_multiplicities
-from spherical_bessel_zeros import Jn_zeros
-from sum_like_atoms import sum_like_atoms
+from utils.composition import get_composition_features
+from utils.lexicographic_multiplicities import apply_multiplicities
+from utils.spherical_bessel_zeros import Jn_zeros, get_laplacian_eigenvalues
+from utils.sum_like_atoms import sum_like_atoms
 
-from LE_iterations import LEIterator
-from LE_invariants import LEInvariantCalculator
+from utils.LE_iterations import LEIterator
+from utils.LE_invariants import LEInvariantCalculator
 
 import os
 import json
@@ -46,7 +46,7 @@ def run_fit(parameters):
     factor = param_dict["factor for radial transform"]
 
     np.random.seed(RANDOM_SEED)
-    print(f"Random seed: {RANDOM_SEED}", flush = True)
+    print(f"Random seed: {RANDOM_SEED}")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     # device = "cpu"
@@ -55,7 +55,9 @@ def run_fit(parameters):
     conversions = {}
     conversions["HARTREE_TO_EV"] = 27.211386245988
     conversions["HARTREE_TO_KCAL_MOL"] = 627.509608030593
+    conversions["EV_TO_KCAL_MOL"] = conversions["HARTREE_TO_KCAL_MOL"]/conversions["HARTREE_TO_EV"]
     conversions["KCAL_MOL_TO_MEV"] = 0.0433641153087705*1000.0
+    conversions["METHANE_FORCE"] = conversions["HARTREE_TO_KCAL_MOL"]/0.529177
 
     CONVERSION_FACTOR = conversions[ENERGY_CONVERSION]
     FORCE_CONVERSION_FACTOR = conversions[FORCE_CONVERSION]
@@ -63,7 +65,7 @@ def run_fit(parameters):
     print("Dataset path: " + DATASET_PATH)
     FORCE_WEIGHT = 1.0/30.0
 
-    if "methane" in DATASET_PATH or "rmd17" in DATASET_PATH:
+    if "methane" in DATASET_PATH or "ch4" in DATASET_PATH or "rmd17" in DATASET_PATH or "gold" in DATASET_PATH:
         n_elems = len(np.unique(ase.io.read(DATASET_PATH, index = "0:1")[0].get_atomic_numbers()))
         print(f"n_elems: {n_elems}")
 
@@ -103,6 +105,10 @@ def run_fit(parameters):
 
     train_structures, test_structures = get_dataset_slices(DATASET_PATH, train_slice, test_slice)
 
+    min_training_set_distance = get_minimum_distance(train_structures)
+    global factor2
+    factor2 = 0.9*min_training_set_distance
+
     train_energies = torch.tensor([structure.info[TARGET_KEY] for structure in train_structures])*CONVERSION_FACTOR
     test_energies = torch.tensor([structure.info[TARGET_KEY] for structure in test_structures])*CONVERSION_FACTOR
 
@@ -110,19 +116,13 @@ def run_fit(parameters):
         train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
         test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
 
-    l_big = 50
-    n_big = 50
-
-    z_ln = Jn_zeros(l_big, n_big)  # Spherical Bessel zeros
-    z_nl = z_ln.T
-
-    E_nl = z_nl**2
+    E_nl = get_laplacian_eigenvalues(50, 50)
 
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
     print(f"All species: {all_species}")
 
     n_max_rs = np.where(E_nl[:, 0] <= E_max[1])[0][-1] + 1
-    print(f"Radial spectrum: n_max = {n_max}")
+    print(f"Radial spectrum: n_max = {n_max_rs}")
 
     date_time = datetime.now()
     date_time = date_time.strftime("%m-%d-%Y-%H-%M-%S-%f")
@@ -134,19 +134,12 @@ def run_fit(parameters):
         l_max = np.where(E_nl[0, :] <= E_max[2])[0][-1]
         print(f"Spherical expansion: n_max = {n_max}, l_max = {l_max}")
 
-        spline_path = "splines/splines-" + date_time + ".txt"
-        write_spline(r_cut, n_max, l_max, spline_path)
-
-        dummy_spherical_expansion = get_LE_expansion(train_structures[:2], spline_path, E_nl, E_max[2], r_cut, all_species, do_gradients=do_gradients, device=device)
-
         # anl counter:
         a_max = len(all_species)
         n_max_l = []
         a_i = all_species[0]
         for l in range(l_max+1):
-            block = dummy_spherical_expansion.block(lam=l, a_i=a_i)
-            n = block.properties["n1"]
-            n_max_l.append(np.max(n)+1)
+            n_max_l.append(np.where(E_nl[:, l] <= E_max[2])[0][-1] + 1)
         combined_anl = {}
         anl_counter = 0
         for a in range(a_max):
@@ -155,14 +148,17 @@ def run_fit(parameters):
                     combined_anl[(a, n, l,)] = anl_counter
                     anl_counter += 1
 
+    spline_path = "splines/splines-" + date_time + ".txt"
+    write_spline(r_cut, n_max, l_max, spline_path)
+
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
     equivariant_calculator = LEIterator(E_nl, combined_anl, all_species)
 
     def get_LE_invariants(structures):
 
-        print("Calculating composition features", flush = True)
+        print("Calculating composition features")
         comp = get_composition_features(structures, all_species)
-        print("Composition features done", flush = True)
+        print("Composition features done")
 
         rs = get_LE_expansion(structures, rs_spline_path, E_nl, E_max[1], r_cut_rs, all_species, rs=True, do_gradients=do_gradients)
         if nu_max > 1: spherical_expansion = get_LE_expansion(structures, spline_path, E_nl, E_max[2], r_cut, all_species, do_gradients=do_gradients, device=device)
@@ -173,14 +169,14 @@ def run_fit(parameters):
 
         for nu in range(2, nu_max+1):
 
-            print(f"Calculating nu = {nu} invariants", flush = True)
+            print(f"Calculating nu = {nu} invariants")
             invariants_nu = invariant_calculator(equivariants_nu_minus_one, spherical_expansion, E_max[nu])
             invariants_nu = apply_multiplicities(invariants_nu, combined_anl)
             invariants.append(invariants_nu)
 
             if nu == nu_max: break  # equivariants for nu_max wouldn't be used
 
-            print(f"Calculating nu = {nu} equivariants", flush = True)
+            print(f"Calculating nu = {nu} equivariants")
             equivariants_nu = equivariant_calculator(equivariants_nu_minus_one, spherical_expansion, E_max[nu+1])
             equivariants_nu_minus_one = equivariants_nu
 
@@ -188,8 +184,7 @@ def run_fit(parameters):
         return X, dX, LE_reg
 
 
-    # Batch training and test set:
-
+    # Divide training and test set into batches (to limit memory usage):
     def get_batches(list: list, batch_size: int) -> list:
         batches = []
         n_full_batches = len(list)//batch_size
@@ -215,6 +210,8 @@ def run_fit(parameters):
     else:
         X_train = torch.concat(X_train, dim = 0)
         # X_train = torch.concat(X_train + [torch.zeros((1, X_train[0].shape[1]))], dim = 0)
+    #X_train = torch.concat([X_train, torch.zeros((1, X_train.shape[1]))], dim = 0)
+    #print(X_train.shape)
 
     X_test = []
     if do_gradients: dX_test = []
@@ -229,93 +226,33 @@ def run_fit(parameters):
     else:
         X_test = torch.concat(X_test, dim = 0)
 
-    print("Features done", flush = True)
-
-    '''
-    print("Normalizing invariants...", flush = True)
-
-    for j in range(X_train.shape[1])[5:]:   # HARDCODED SHIT... 5 is the number of nu = 0 stuff
-        if j % 1000 == 0: print(X_train[:, j])
-        mean = torch.mean(X_train[:, j])
-        if j % 1000 == 0: print(mean)
-        X_train[:, j] -= 0.0
-        X_test[:, j] -= 0.0
-        stddev = torch.sqrt(torch.mean(X_train[:, j]**2))
-        if j % 1000 == 0: print(stddev)
-        if stddev == 0.0: continue   # Features that are zero either geometrically or due to generalized CG degeneracies
-        X_train[:, j] /= stddev
-        X_test[:, j] /= stddev
-
-    print("Normalization done", flush = True)
-    '''
-
-    # validation_cycle = ValidationCycleLinear(alpha_exp_initial_guess = -5.0)
+    print("Features done")
 
     print("Beginning hyperparameter optimization")
-
-    """ def validation_loss_for_global_optimization(x):
-
-        validation_cycle.sigma_exponent = torch.nn.Parameter(
-                torch.tensor(x[-1], dtype = torch.get_default_dtype())
-            )
-
-        validation_loss = 0.0
-        for i_validation_split in range(n_validation_splits):
-            index_validation_start = i_validation_split*n_validation
-            index_validation_stop = index_validation_start + n_validation
-
-            X_train_sub = torch.empty((n_train_sub, X_train.shape[1]))
-            X_train_sub[:index_validation_start, :] = X_train[:index_validation_start, :]
-            if i_validation_split != n_validation_splits - 1:
-                X_train_sub[index_validation_start:, :] = X_train[index_validation_stop:, :]
-            y_train_sub = train_energies[:index_validation_start]
-            if i_validation_split != n_validation_splits - 1:
-                y_train_sub = torch.concat([y_train_sub, train_energies[index_validation_stop:]])
-
-            X_validation = X_train[index_validation_start:index_validation_stop, :]
-            y_validation = train_energies[index_validation_start:index_validation_stop] 
-
-            with torch.no_grad():
-                validation_predictions = validation_cycle(X_train_sub, y_train_sub, X_validation)
-                validation_loss += get_sse(validation_predictions, y_validation).item()
-        '''
-        with open("log.txt", "a") as out:
-            out.write(str(np.sqrt(validation_loss/n_train)) + "\n")
-            out.flush()
-        '''
-
-        return validation_loss
-
-    symm = X_train.T @ X_train
-    rmses = []
-    alpha_list = np.linspace(-5, 0, 20)
-    for alpha in alpha_list:
-        loss = validation_loss_for_global_optimization([alpha])
-        print(alpha, loss)
-        rmses.append(loss) """
 
     if do_gradients:
         train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
         test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
     else:
         train_targets = train_energies
-        # train_targets = torch.concat([train_energies, torch.tensor([0.0])])
+        #train_targets = torch.concat([train_energies, torch.tensor([0.0])])
         test_targets = test_energies
 
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
     opt_target = []
     alpha_list = np.linspace(-13.0, -3.0, 41)
+    # alpha_list = np.linspace(-5.0, 5.0, 41)
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
 
     for alpha in alpha_list:
-        # X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
+        #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
         for i in range(n_feat):
             symm[i, i] += 10**alpha*LE_reg[i]
 
         try:
-            # c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd").solution
+            #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
             c = torch.linalg.solve(symm, vec)
         except Exception as e:
             print(e)
@@ -323,8 +260,7 @@ def run_fit(parameters):
             continue
         train_predictions = X_train @ c
         test_predictions = X_test @ c
-        print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, flush=True)
-        # rmses.append(get_mae(test_predictions, test_energies).item())
+        print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
         if opt_target_name == "mae":
             opt_target.append(get_mae(test_predictions[:n_test], test_targets[:n_test]).item())
         else:
@@ -339,8 +275,27 @@ def run_fit(parameters):
     for i in range(n_feat):
         symm[i, i] += 10**best_alpha*LE_reg[i]
     c = torch.linalg.solve(symm, vec)
+
+    #X_train[-1, :] = torch.sqrt(10**best_alpha*LE_reg)
+    #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
+
     test_predictions = X_test @ c
     print("n_train:", n_train, "n_features:", n_feat)
     print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT}]")
+
+    exit()
+
+    from ase import io
+    for length_exp in range(0, 10):
+        length = 2**length_exp
+        dummy_structure = ase.io.read(DATASET_PATH, index = ":" + str(length))
+        X, dX, LE_reg = get_LE_invariants(dummy_structure)
+        import time
+        time_before = time.time()
+        X, dX, LE_reg = get_LE_invariants(dummy_structure)
+        # e = X@c
+        print(length, time.time()-time_before)
+        # print("Energy: ", e, dummy_structure[0].info[TARGET_KEY]*CONVERSION_FACTOR)
+
     os.remove(rs_spline_path)
     os.remove(spline_path)

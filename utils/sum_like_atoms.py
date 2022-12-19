@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from LE_regularization import get_LE_regularization
+from .LE_regularization import get_LE_regularization
 
 def sum_like_atoms(comp, invariants, species, E_nl):
 
@@ -63,11 +63,12 @@ def sum_like_atoms(comp, invariants, species, E_nl):
     """
     comp = comp.values
     LE_reg_comp = torch.tensor([0.0]*len(species))
+    # LE_reg_comp = torch.tensor([1e-4]*len(species))  # this seems to work ok; needs more testing 
     """
     comp = torch.ones(features[0].shape[0], 1)  # MD-like
     LE_reg_comp = torch.tensor([0.0])
     if len(d_features) != 0: d_comp = torch.zeros((d_features[0].shape[0], 3, 1))
-    
+
     X = torch.concat([comp] + features, dim = -1)
     LE_reg = torch.concat([LE_reg_comp] + LE_reg, dim = -1)
     

@@ -17,3 +17,11 @@ def Jn_zeros(n, nt):
     points = racines
     zerosj[i][:nt] = racines[:nt]
   return (zerosj)
+
+
+def get_laplacian_eigenvalues(n_big, l_big):
+
+    z_ln = Jn_zeros(l_big, n_big)
+    z_nl = z_ln.T
+
+    return z_nl**2
