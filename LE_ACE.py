@@ -9,7 +9,7 @@ from ase import io
 
 from utils.dataset_processing import get_dataset_slices, get_minimum_distance
 from utils.error_measures import get_rmse, get_mae
-
+from utils.cg import ClebschGordanReal
 from utils.composition import get_composition_features
 from utils.lexicographic_multiplicities import apply_multiplicities
 from utils.spherical_bessel_zeros import Jn_zeros, get_laplacian_eigenvalues
@@ -152,7 +152,8 @@ def run_fit(parameters):
     write_spline(r_cut, n_max, l_max, spline_path)
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
-    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species)
+    cg_object = ClebschGordanReal(algorithm="slow")
+    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object)
 
     def get_LE_invariants(structures):
 

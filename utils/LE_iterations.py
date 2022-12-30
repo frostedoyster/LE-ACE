@@ -2,13 +2,11 @@ import numpy as np
 import torch
 
 from equistore import TensorMap, Labels, TensorBlock
-from .cg import ClebschGordanReal
-import sparse_accumulation
 
 
 class LEIterator(torch.nn.Module):
 
-    def __init__(self, E_nl, combined_anl, all_species, algorithm = "fast cg"):
+    def __init__(self, E_nl, combined_anl, all_species, cg_object):
         super(LEIterator, self).__init__()
 
         # Initialize with information that comes from nu = 1 and which is useful at every iteration:
@@ -16,8 +14,7 @@ class LEIterator(torch.nn.Module):
         self.combined_anl = combined_anl
         self.all_species = all_species
         
-        self.algorithm = algorithm
-        self.cg_object = ClebschGordanReal(0, 0)
+        self.cg_object = cg_object
 
         self.nu_plus_one_count = {}
         self.properties_values = {}
@@ -36,11 +33,6 @@ class LEIterator(torch.nn.Module):
             lam_max = max(lam_max, idx["lam"])
 
         L_max = lam_max + l_max
-
-        print("Calculating real CGs")
-        self.cg_object.add(lam_max, l_max)
-        print("CGs finished")
-        cg = self.cg_object._cg
 
         nu = len(LE_nu.block(0).properties.names)//4  # Infer nu from the length of the history indices.
 
@@ -138,7 +130,7 @@ class LEIterator(torch.nn.Module):
                     for L in range(np.abs(lam-l), lam+l+1):
                         if (lam, l, L) not in selected_features: continue  # No features are selected.
                         
-                        nu_plus_one_values, nu_plus_one_derivatives = self._cg_combine(block_nu, block_1, selected_features[(lam, l, L)], cg[(lam, l, L)])
+                        nu_plus_one_values, nu_plus_one_derivatives = self.cg_object.combine(block_nu, block_1, L, selected_features[(lam, l, L)])
                         data[L][:, :, nu_plus_one_count[L]:nu_plus_one_count[L]+selected_features[(lam, l, L)].shape[0]] = nu_plus_one_values
 
                         if do_gradients:
@@ -186,65 +178,4 @@ class LEIterator(torch.nn.Module):
             blocks = blocks)
 
         return LE_nu_plus_one
-
-
-    def _cg_combine(self, block_nu, block_1, selected_features, sparse_cg_tensor):
-
-        lam = (block_nu.values.shape[1] - 1) // 2
-        l = (block_1.values.shape[1] - 1) // 2
-
-        mu_array = sparse_cg_tensor.m1
-        m_array = sparse_cg_tensor.m2
-        M_array = sparse_cg_tensor.M
-        cg_array = sparse_cg_tensor.cg
-
-        L = int(torch.max(M_array)) // 2  # these go from 0 to 2L
-
-        if self.algorithm == "fast cg":
-
-            nu_plus_one_values = sparse_accumulation.accumulate_active_dim_middle(
-                block_nu.values[:, :, selected_features[:, 0]].contiguous(),
-                block_1.values[:, :, selected_features[:, 1]].contiguous(), 
-                M_array, 
-                2*L+1, 
-                mu_array, 
-                m_array, 
-                cg_array
-            )
-
-            if block_nu.has_gradient("positions"):
-                gradients_nu = block_nu.gradient("positions")
-                samples_for_gradients_nu = torch.tensor(gradients_nu.samples["sample"], dtype=torch.int64)
-                gradients_1 = block_1.gradient("positions")
-                samples_for_gradients_1 = torch.tensor(gradients_1.samples["sample"], dtype=torch.int64)
-                n_selected_features = selected_features.shape[0]
-
-                nu_plus_one_derivatives = (sparse_accumulation.accumulate_active_dim_middle(
-                    gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
-                    block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
-                    M_array, 
-                    2*L+1, 
-                    mu_array, 
-                    m_array, 
-                    cg_array
-                ) + sparse_accumulation.accumulate_active_dim_middle(
-                    block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
-                    gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
-                    M_array, 
-                    2*L+1, 
-                    mu_array, 
-                    m_array, 
-                    cg_array
-                )).reshape((-1, 3, 2*L+1, n_selected_features))
-            else:
-                nu_plus_one_derivatives = None
-
-        else:  # Python loop algorithm
-            """
-            for mu, m, M, cg_coefficient in zip(sparse_cg_tensor.m1, sparse_cg_tensor.m2, sparse_cg_tensor.M, sparse_cg_tensor.cg):
-                data[L][:, M, nu_plus_one_count[L]:nu_plus_one_count[L]+selected_features.shape[0]] += cg_coefficient * block_nu.values[:, mu, selected_features[:, 0]] * block_1.values[:, m, selected_features[:, 1]]
-                if block_nu.has_gradient("positions"): 
-                    gradient_data[L][:, :, M, nu_plus_one_count[L]:nu_plus_one_count[L]+selected_features.shape[0]] += cg_coefficient * (gradients_nu.data[:, :, mu, selected_features[:, 0]] * block_1.values[samples_for_gradients_nu][:, m, selected_features[:, 1]].unsqueeze(dim=1) + block_nu.values[samples_for_gradients_1][:, mu, selected_features[:, 0]].unsqueeze(dim=1) * gradients_1.data[:, :, m, selected_features[:, 1]])  # exploiting broadcasting rules
-            """
-        return nu_plus_one_values, nu_plus_one_derivatives
 
