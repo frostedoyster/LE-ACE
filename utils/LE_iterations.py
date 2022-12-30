@@ -6,15 +6,15 @@ from equistore import TensorMap, Labels, TensorBlock
 
 class LEIterator(torch.nn.Module):
 
-    def __init__(self, E_nl, combined_anl, all_species, cg_object):
+    def __init__(self, E_nl, combined_anl, all_species, cg_object, L_max=None):
         super(LEIterator, self).__init__()
 
         # Initialize with information that comes from nu = 1 and which is useful at every iteration:
         self.E_nl = E_nl
         self.combined_anl = combined_anl
         self.all_species = all_species
-        
         self.cg_object = cg_object
+        self.L_max = L_max
 
         self.nu_plus_one_count = {}
         self.properties_values = {}
@@ -32,7 +32,10 @@ class LEIterator(torch.nn.Module):
         for idx, block in LE_nu:
             lam_max = max(lam_max, idx["lam"])
 
-        L_max = lam_max + l_max
+        if self.L_max is None:
+            L_max = lam_max + l_max
+        else:
+            L_max = self.L_max
 
         nu = len(LE_nu.block(0).properties.names)//4  # Infer nu from the length of the history indices.
 
@@ -70,7 +73,7 @@ class LEIterator(torch.nn.Module):
                         a_nu_plus_1 = block_1.properties["a1"]
                         n_nu_plus_1 = block_1.properties["n1"]
 
-                        for L in range(np.abs(lam-l), lam+l+1):
+                        for L in range(np.abs(lam-l), min(lam+l+1, L_max)):
                             selected_features[(lam, l, L)] = []
 
                         for q_nu in range(block_nu.values.shape[-1]):
@@ -86,7 +89,7 @@ class LEIterator(torch.nn.Module):
 
                                 properties_list = [[block_nu.properties[name][q_nu] for name in block_nu.properties.names] + [block_1.properties[name][q_1] for name in block_1.properties.names[:-1]] + [lam]]
                                 
-                                for L in range(np.abs(lam-l), lam+l+1):
+                                for L in range(np.abs(lam-l), min(lam+l+1, L_max)):
                                     # Avoid calculating trivial nu = 2 zeros:
                                     if nu == 1 and lam == l and L % 2 == 1: continue
                                     nu_plus_one_count[L] += 1
@@ -127,7 +130,7 @@ class LEIterator(torch.nn.Module):
                 for l in range(l_max+1):
                     block_1 = LE_1.block(lam=l, a_i=a_i)
 
-                    for L in range(np.abs(lam-l), lam+l+1):
+                    for L in range(np.abs(lam-l), min(lam+l+1, L_max)):
                         if (lam, l, L) not in selected_features: continue  # No features are selected.
                         
                         nu_plus_one_values, nu_plus_one_derivatives = self.cg_object.combine(block_nu, block_1, L, selected_features[(lam, l, L)])

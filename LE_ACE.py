@@ -152,8 +152,8 @@ def run_fit(parameters):
     write_spline(r_cut, n_max, l_max, spline_path)
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
-    cg_object = ClebschGordanReal(algorithm="slow")
-    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object)
+    cg_object = ClebschGordanReal()
+    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=None)
 
     def get_LE_invariants(structures):
 
