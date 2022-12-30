@@ -241,7 +241,7 @@ def run_fit(parameters):
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
     opt_target = []
-    alpha_list = np.linspace(-13.0, -3.0, 41)
+    alpha_list = np.linspace(-16.0, -6.0, 41)
     # alpha_list = np.linspace(-5.0, 5.0, 41)
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
@@ -283,19 +283,25 @@ def run_fit(parameters):
     print("n_train:", n_train, "n_features:", n_feat)
     print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT}]")
 
-    exit()
-
+    # Uncomment for speed evaluation
+    """
     from ase import io
     for length_exp in range(0, 10):
         length = 2**length_exp
         dummy_structure = ase.io.read(DATASET_PATH, index = ":" + str(length))
-        X, dX, LE_reg = get_LE_invariants(dummy_structure)
         import time
         time_before = time.time()
-        X, dX, LE_reg = get_LE_invariants(dummy_structure)
-        # e = X@c
-        print(length, time.time()-time_before)
-        # print("Energy: ", e, dummy_structure[0].info[TARGET_KEY]*CONVERSION_FACTOR)
+        for _ in range(10):
+            X, dX, LE_reg = get_LE_invariants(dummy_structure)
+            # e = X@c
+        print()
+        print()
+        print()
+        print(length, (time.time()-time_before)/10)
+        print()
+        print()
+        print()
+    """
 
     os.remove(rs_spline_path)
     os.remove(spline_path)

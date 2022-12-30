@@ -198,19 +198,19 @@ class LEIterator(torch.nn.Module):
         M_array = sparse_cg_tensor.M
         cg_array = sparse_cg_tensor.cg
 
-        L = torch.max(M_array) // 2  # these go from 0 to 2L
+        L = int(torch.max(M_array)) // 2  # these go from 0 to 2L
 
         if self.algorithm == "fast cg":
 
-            nu_plus_one_values = sparse_accumulation.accumulate(
-                block_nu.values[:, :, selected_features[:, 0]].swapaxes(1, 2).contiguous(),
-                block_1.values[:, :, selected_features[:, 1]].swapaxes(1, 2).contiguous(), 
+            nu_plus_one_values = sparse_accumulation.accumulate_active_dim_middle(
+                block_nu.values[:, :, selected_features[:, 0]].contiguous(),
+                block_1.values[:, :, selected_features[:, 1]].contiguous(), 
                 M_array, 
                 2*L+1, 
                 mu_array, 
                 m_array, 
                 cg_array
-            ).swapaxes(1, 2)
+            )
 
             if block_nu.has_gradient("positions"):
                 gradients_nu = block_nu.gradient("positions")
@@ -218,23 +218,24 @@ class LEIterator(torch.nn.Module):
                 gradients_1 = block_1.gradient("positions")
                 samples_for_gradients_1 = torch.tensor(gradients_1.samples["sample"], dtype=torch.int64)
                 n_selected_features = selected_features.shape[0]
-                nu_plus_one_derivatives = (sparse_accumulation.accumulate(
-                    gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
-                    block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+
+                nu_plus_one_derivatives = (sparse_accumulation.accumulate_active_dim_middle(
+                    gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
+                    block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
                     M_array, 
                     2*L+1, 
                     mu_array, 
                     m_array, 
                     cg_array
-                ) + sparse_accumulation.accumulate(
-                    block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
-                    gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                ) + sparse_accumulation.accumulate_active_dim_middle(
+                    block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
+                    gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
                     M_array, 
                     2*L+1, 
                     mu_array, 
                     m_array, 
                     cg_array
-                )).swapaxes(1, 2).reshape((-1, 3, 2*L+1, n_selected_features))
+                )).reshape((-1, 3, 2*L+1, n_selected_features))
             else:
                 nu_plus_one_derivatives = None
 

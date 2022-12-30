@@ -22,7 +22,7 @@ def get_dataset_slices(dataset_path, train_slice, test_slice):
 
     elif "methane" in dataset_path:
         print("Reading dataset")
-        all_structures = ase.io.read(dataset_path, index = ":500000")
+        all_structures = ase.io.read(dataset_path, index = ":10000")
         print("Shuffling and extracting from dataset")
         np.random.shuffle(all_structures)
         train_index_begin = int(train_slice.split(":")[0])

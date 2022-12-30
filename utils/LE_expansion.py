@@ -179,7 +179,7 @@ def write_spline(a, n_max, l_max, path):
         R = np.zeros_like(r)
         for i in range(r.shape[0]):
             R[i] = R_nl(n, l, r[i])
-        return N_nl(n, l)*R*a**(-1.5)
+        return N_nl(n, l)*R*a**(-1.5)  # This is what makes the results different when you increasing a indefinitely.
         '''
         # second kind
         ret = y_l(l, z_nl[n, l]*r/a)
@@ -201,7 +201,7 @@ def write_spline(a, n_max, l_max, path):
         # Calculates radially transformed LE radial basis function for a 1D array of values r.
         x = radial_transform(r)
         from LE_ACE import factor, factor2
-        return get_LE_function(n, l, x)
+        return get_LE_function(n, l, x)*np.exp(-r/factor)
 
     def cutoff_function(r):
         cutoff = 3.0
@@ -227,6 +227,7 @@ def write_spline(a, n_max, l_max, path):
 
     def function_for_splining(n, l, x):
         return get_LE_radial_transform(n, l, x)
+        # return get_LE_function(n, l, x)
 
     spline_f = []
     for l in range(l_max+1):
@@ -261,3 +262,55 @@ def write_spline(a, n_max, l_max, path):
         np.savetxt(file, (1.0/(4.0*np.pi))*spline_df.flatten(), newline=" ")
         file.write("\n")
 
+    # Uncomment this to inspect the spherical expanion
+    """
+    if l_max != 0:
+        import ase
+
+        def get_dummy_structures(r_array):
+            dummy_structures = []
+            for r in r_array:
+                dummy_structures.append(
+                    ase.Atoms('CH', positions=[(0, 0, 0), (0, 0, r)])
+                )
+            return dummy_structures 
+
+        # Create a fake list of dummy structures to test the radial functions generated from rascaline.
+
+        r = np.linspace(0.1, a-0.001, 1000)
+        structures = get_dummy_structures(r)
+
+        hypers_spherical_expansion = {
+            "cutoff": a,
+            "max_radial": int(n_max),
+            "max_angular": int(l_max),
+            "center_atom_weight": 0.0,
+            "radial_basis": {"Tabulated": {"file": path}},
+            "atomic_gaussian_width": 100.0,
+            "cutoff_function": {"Step": {}},
+        }
+
+        calculator = SphericalExpansion(**hypers_spherical_expansion)
+        spherical_expansion_coefficients = calculator.compute(structures)
+
+        block_C_0 = spherical_expansion_coefficients.block(species_center = 6, spherical_harmonics_l = 0, species_neighbor = 1)
+        print(block_C_0.values.shape)
+
+        block_C_0_0 = block_C_0.values[:, :, 6].flatten()
+        spherical_harmonics_0 = 1.0/np.sqrt(4.0*np.pi)
+
+        all_species = np.unique(spherical_expansion_coefficients.keys["species_center"])
+        all_neighbor_species = Labels(
+                names=["species_neighbor"],
+                values=np.array(all_species, dtype=np.int32).reshape(-1, 1),
+            )
+        spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
+
+        import matplotlib.pyplot as plt
+        plt.plot(r, block_C_0_0/spherical_harmonics_0, label="rascaline output")  # rascaline bug?
+        plt.plot([0.0, a], [0.0, 0.0], "black")
+        plt.plot(r, function_for_splining(n=6, l=0, x=r), "--", label="original function")
+        plt.xlim(0.0, a)
+        plt.legend()
+        plt.savefig("radial.pdf")
+    """

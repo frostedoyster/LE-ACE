@@ -4,7 +4,7 @@ import numpy as np
 from equistore import TensorBlock, TensorMap
 
 def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
-    # CAREFUL. ASSUMES ALL ELEMENT CENTER BLOCKS ARE THE SAME
+    # Assumes all center elements are truncated in the same way
 
     nu = len(old_map.block(0).properties.names)//4
     block = old_map.block(0)
@@ -19,7 +19,7 @@ def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
         multiplicity = math.factorial(nu)
         for count in counts:
             multiplicity = multiplicity/math.factorial(count)
-        # multiplicity = np.sqrt(multiplicity)
+        multiplicity = np.sqrt(multiplicity)
         multiplicities.append(multiplicity)
     multiplicities = torch.tensor(multiplicities, device=old_map.block(0).values.device)
     # print(multiplicities)
