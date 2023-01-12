@@ -66,7 +66,7 @@ def sum_like_atoms(comp, invariants, species, E_nl):
     # LE_reg_comp = torch.tensor([1e-4]*len(species))  # this seems to work ok; needs more testing 
     """
     comp = torch.ones(features[0].shape[0], 1)  # MD-like
-    LE_reg_comp = torch.tensor([0.0])
+    LE_reg_comp = torch.tensor([1e10])
     if len(d_features) != 0: d_comp = torch.zeros((d_features[0].shape[0], 3, 1))
 
     X = torch.concat([comp] + features, dim = -1)

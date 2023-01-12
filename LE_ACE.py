@@ -58,12 +58,13 @@ def run_fit(parameters):
     conversions["EV_TO_KCAL_MOL"] = conversions["HARTREE_TO_KCAL_MOL"]/conversions["HARTREE_TO_EV"]
     conversions["KCAL_MOL_TO_MEV"] = 0.0433641153087705*1000.0
     conversions["METHANE_FORCE"] = conversions["HARTREE_TO_KCAL_MOL"]/0.529177
+    conversions["NO_CONVERSION"] = 1.0
 
     CONVERSION_FACTOR = conversions[ENERGY_CONVERSION]
     FORCE_CONVERSION_FACTOR = conversions[FORCE_CONVERSION]
 
     print("Dataset path: " + DATASET_PATH)
-    FORCE_WEIGHT = 1.0/30.0
+    FORCE_WEIGHT = 1.0
 
     if "methane" in DATASET_PATH or "ch4" in DATASET_PATH or "rmd17" in DATASET_PATH or "gold" in DATASET_PATH:
         n_elems = len(np.unique(ase.io.read(DATASET_PATH, index = "0:1")[0].get_atomic_numbers()))
@@ -153,7 +154,7 @@ def run_fit(parameters):
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
     cg_object = ClebschGordanReal()
-    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=None)
+    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=3)
 
     def get_LE_invariants(structures):
 
@@ -207,7 +208,7 @@ def run_fit(parameters):
         if do_gradients: dX_train.append(-FORCE_WEIGHT*dX.reshape(dX.shape[0]*3, dX.shape[2]))  # note the minus sign
 
     if do_gradients:
-        X_train = torch.concat(X_train + dX_train, dim = 0)
+        X_train = torch.concat(dX_train, dim = 0)
     else:
         X_train = torch.concat(X_train, dim = 0)
         # X_train = torch.concat(X_train + [torch.zeros((1, X_train[0].shape[1]))], dim = 0)
@@ -223,7 +224,7 @@ def run_fit(parameters):
         if do_gradients: dX_test.append(-FORCE_WEIGHT*dX.reshape(dX.shape[0]*3, dX.shape[2]))  # note the minus sign
 
     if do_gradients:
-        X_test = torch.concat(X_test + dX_test, dim = 0)
+        X_test = torch.concat(dX_test, dim = 0)
     else:
         X_test = torch.concat(X_test, dim = 0)
 
@@ -232,8 +233,8 @@ def run_fit(parameters):
     print("Beginning hyperparameter optimization")
 
     if do_gradients:
-        train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
-        test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
+        train_targets = train_forces.reshape((-1,))
+        test_targets = test_forces.reshape((-1,))
     else:
         train_targets = train_energies
         #train_targets = torch.concat([train_energies, torch.tensor([0.0])])
@@ -261,11 +262,11 @@ def run_fit(parameters):
             continue
         train_predictions = X_train @ c
         test_predictions = X_test @ c
-        print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
+        print(alpha, get_rmse(train_predictions, train_targets).item()/FORCE_WEIGHT, get_mae(train_predictions, train_targets).item()/FORCE_WEIGHT, get_rmse(test_predictions, test_targets).item()/FORCE_WEIGHT, get_mae(test_predictions, test_targets).item()/FORCE_WEIGHT)
         if opt_target_name == "mae":
-            opt_target.append(get_mae(test_predictions[:n_test], test_targets[:n_test]).item())
+            opt_target.append(get_mae(test_predictions, test_targets).item())
         else:
-            opt_target.append(get_rmse(test_predictions[:n_test], test_targets[:n_test]).item())
+            opt_target.append(get_rmse(test_predictions, test_targets).item())
 
         for i in range(n_feat):
             symm[i, i] -= 10.0**alpha*LE_reg[i]
@@ -282,27 +283,27 @@ def run_fit(parameters):
 
     test_predictions = X_test @ c
     print("n_train:", n_train, "n_features:", n_feat)
-    print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT}]")
+    print(f"Test error RMSE (F): {get_rmse(test_predictions, test_targets).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions, test_targets).item()/FORCE_WEIGHT}]")
+    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0}%")
+    # print(c[0])
 
-    # Uncomment for speed evaluation
-    """
+    # Speed evaluation
+    # """
     from ase import io
-    for length_exp in range(0, 10):
-        length = 2**length_exp
-        dummy_structure = ase.io.read(DATASET_PATH, index = ":" + str(length))
-        import time
-        time_before = time.time()
-        for _ in range(10):
-            X, dX, LE_reg = get_LE_invariants(dummy_structure)
-            # e = X@c
-        print()
-        print()
-        print()
-        print(length, (time.time()-time_before)/10)
-        print()
-        print()
-        print()
-    """
+    length = 1
+    dummy_structure = ase.io.read(DATASET_PATH, index = ":" + str(length))
+    import time
+    time_before = time.time()
+    for _ in range(10):
+        X, dX, LE_reg = get_LE_invariants(dummy_structure)
+        forces = - dX @ c
+    print()
+    print()
+    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0}%")
+    print("Estimated time per MD step: ", (time.time()-time_before)/10)
+    print()
+    print()
+    # """
 
     os.remove(rs_spline_path)
     os.remove(spline_path)
