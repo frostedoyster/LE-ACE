@@ -44,6 +44,8 @@ def run_fit(parameters):
     opt_target_name = param_dict["optimization target"]
     global factor 
     factor = param_dict["factor for radial transform"]
+    L_max = param_dict["L_max"]
+    print(L_max)
 
     np.random.seed(RANDOM_SEED)
     print(f"Random seed: {RANDOM_SEED}")
@@ -154,7 +156,7 @@ def run_fit(parameters):
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
     cg_object = ClebschGordanReal()
-    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=3)
+    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=L_max)
 
     def get_LE_invariants(structures):
 

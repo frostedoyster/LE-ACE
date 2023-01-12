@@ -1,17 +1,18 @@
 {
     "random seed": 0,
-    "batch size": 1000,
+    "batch size": 500,
     "energy conversion": "NO_CONVERSION",
     "force conversion": "NO_CONVERSION",
     "target key": "energy",
-    "dataset path": "datasets/rmd17/benzene.extxyz",
+    "dataset path": "datasets/methane_reduced.extxyz",
     "n_test": 500,
     "n_train": 1000,
     "do gradients": true, 
     "r_cut": 6.0, 
     "r_cut_rs": 6.0,
     "nu_max": 4,
-    "E_max coefficients" : [0.0, 50.0, 40.0, 60.0, 80.0],
+    "E_max coefficients" : [0.0, 30.0, 40.0, 40.0, 60.0],
     "optimization target": "rmse",
-    "factor for radial transform": 2.5
+    "factor for radial transform": 2.5,
+    "L_max": null
 }
