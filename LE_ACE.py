@@ -40,7 +40,8 @@ def run_fit(parameters):
     global r_cut_rs
     r_cut_rs = param_dict["r_cut_rs"]
     nu_max = param_dict["nu_max"]
-    E_max_coefficients = param_dict["E_max coefficients"]
+    # E_max_coefficients = param_dict["E_max coefficients"]
+    E_max = param_dict["E_max"]
     opt_target_name = param_dict["optimization target"]
     global factor 
     factor = param_dict["factor for radial transform"]
@@ -68,6 +69,7 @@ def run_fit(parameters):
     print("Dataset path: " + DATASET_PATH)
     FORCE_WEIGHT = 1.0
 
+    """
     if "methane" in DATASET_PATH or "ch4" in DATASET_PATH or "rmd17" in DATASET_PATH or "gold" in DATASET_PATH:
         n_elems = len(np.unique(ase.io.read(DATASET_PATH, index = "0:1")[0].get_atomic_numbers()))
         print(f"n_elems: {n_elems}")
@@ -88,8 +90,10 @@ def run_fit(parameters):
         if iota == 0: continue
         E_max.append(E_max_coefficients[iota]*(n_train_effective/element_factors[iota])**(2.0/(3.0*iota)))
     print(E_max)
+    """
 
-    if not np.all(np.array(E_max[:-1]) >= np.array(E_max[1:])): print("LE WARNING: max eigenvalues not in descending order")
+    print("LE eigenvalues:", E_max)
+    if not np.all(np.array(E_max[1:-1]) >= np.array(E_max[2:])): print("LE WARNING: max eigenvalues not in descending order")
     assert len(E_max) == nu_max + 1 
 
     # Decrease nu_max if LE threshold is too low:
@@ -286,7 +290,7 @@ def run_fit(parameters):
     test_predictions = X_test @ c
     print("n_train:", n_train, "n_features:", n_feat)
     print(f"Test error RMSE (F): {get_rmse(test_predictions, test_targets).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions, test_targets).item()/FORCE_WEIGHT}]")
-    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0}%")
+    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0} %")
     # print(c[0])
 
     # Speed evaluation
@@ -296,13 +300,16 @@ def run_fit(parameters):
     dummy_structure = ase.io.read(DATASET_PATH, index = ":" + str(length))
     import time
     time_before = time.time()
-    for _ in range(10):
+    n_tries = 10
+    for _ in range(n_tries):
         X, dX, LE_reg = get_LE_invariants(dummy_structure)
         forces = - dX @ c
     print()
     print()
-    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0}%")
-    print("Estimated time per MD step: ", (time.time()-time_before)/10)
+    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0} %")
+    print(f"Test error RMSE (atomic units): {get_rmse(test_predictions, test_targets).item()/FORCE_WEIGHT} [MAE: {get_mae(test_predictions, test_targets).item()/FORCE_WEIGHT}]")
+    print(f"Test error RMSE (cm^-1): {get_rmse(test_predictions, test_targets).item()*219474.63/FORCE_WEIGHT} [MAE: {get_mae(test_predictions, test_targets).item()*219474.63/FORCE_WEIGHT}]")
+    print(f"Estimated time per MD step: {(time.time()-time_before)/n_tries} s")
     print()
     print()
     # """
