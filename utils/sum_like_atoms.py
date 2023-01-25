@@ -45,7 +45,10 @@ def sum_like_atoms(comp, invariants, species, E_nl):
                 features_current_center_species[structures[i], :] += center_features[i, :]
             features.append(features_current_center_species)
 
-            from LE_ACE import r_cut_rs, r_cut
+            try:
+                from LE_ACE import r_cut, r_cut_rs
+            except:
+                r_cut, r_cut_rs = 5.0, 5.0
             LE_reg.append(get_LE_regularization(invariant_block.properties, E_nl, r_cut_rs, r_cut))
 
             if invariant_block.has_gradient("positions"):

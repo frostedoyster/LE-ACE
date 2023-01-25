@@ -1,3 +1,8 @@
+import argparse
+import os
+import ase
+from ase import io
+
 from utils.LE_expansion import get_LE_expansion, write_spline
 
 import math
@@ -9,7 +14,7 @@ from ase import io
 
 from utils.dataset_processing import get_dataset_slices, get_minimum_distance
 from utils.error_measures import get_rmse, get_mae
-from utils.cg import ClebschGordanReal
+
 from utils.composition import get_composition_features
 from utils.lexicographic_multiplicities import apply_multiplicities
 from utils.spherical_bessel_zeros import Jn_zeros, get_laplacian_eigenvalues
@@ -17,13 +22,12 @@ from utils.sum_like_atoms import sum_like_atoms
 
 from utils.LE_iterations import LEIterator
 from utils.LE_invariants import LEInvariantCalculator
+from utils.cg import ClebschGordanReal
 
 import os
 import json
 
-torch.set_default_dtype(torch.float64)
-
-def run_fit(parameters):
+def evaluate(parameters):
 
     param_dict = json.load(open(parameters, "r"))
     RANDOM_SEED = param_dict["random seed"]
@@ -116,13 +120,6 @@ def run_fit(parameters):
     global factor2
     factor2 = 0.9*min_training_set_distance
 
-    train_energies = torch.tensor([structure.info[TARGET_KEY] for structure in train_structures])*CONVERSION_FACTOR
-    test_energies = torch.tensor([structure.info[TARGET_KEY] for structure in test_structures])*CONVERSION_FACTOR
-
-    if do_gradients:
-        train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
-        test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
-
     E_nl = get_laplacian_eigenvalues(50, 50)
 
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
@@ -191,111 +188,8 @@ def run_fit(parameters):
         X, dX, LE_reg = sum_like_atoms(comp, invariants, all_species, E_nl)
         return X, dX, LE_reg
 
+    c = torch.load("cfile.pt").to(device)
 
-    # Divide training and test set into batches (to limit memory usage):
-    def get_batches(list: list, batch_size: int) -> list:
-        batches = []
-        n_full_batches = len(list)//batch_size
-        for i_batch in range(n_full_batches):
-            batches.append(list[i_batch*batch_size:(i_batch+1)*batch_size])
-        if len(list) % batch_size != 0:
-            batches.append(list[n_full_batches*batch_size:])
-        return batches
-
-    train_structures = get_batches(train_structures, BATCH_SIZE)
-    test_structures = get_batches(test_structures, BATCH_SIZE)
-
-    X_train = []
-    if do_gradients: dX_train = []
-    for i_batch, batch in enumerate(train_structures):
-        print(f"DOING TRAIN BATCH {i_batch+1} out of {len(train_structures)}")
-        X, dX, LE_reg = get_LE_invariants(batch)
-        X_train.append(X)
-        if do_gradients: dX_train.append(-FORCE_WEIGHT*dX.reshape(dX.shape[0]*3, dX.shape[2]))  # note the minus sign
-
-    if do_gradients:
-        X_train = torch.concat(dX_train, dim = 0)
-    else:
-        X_train = torch.concat(X_train, dim = 0)
-        # X_train = torch.concat(X_train + [torch.zeros((1, X_train[0].shape[1]))], dim = 0)
-    #X_train = torch.concat([X_train, torch.zeros((1, X_train.shape[1]))], dim = 0)
-    #print(X_train.shape)
-
-    X_test = []
-    if do_gradients: dX_test = []
-    for i_batch, batch in enumerate(test_structures):
-        print(f"DOING TEST BATCH {i_batch+1} out of {len(test_structures)}")
-        X, dX, LE_reg = get_LE_invariants(batch)
-        X_test.append(X)
-        if do_gradients: dX_test.append(-FORCE_WEIGHT*dX.reshape(dX.shape[0]*3, dX.shape[2]))  # note the minus sign
-
-    if do_gradients:
-        X_test = torch.concat(dX_test, dim = 0)
-    else:
-        X_test = torch.concat(X_test, dim = 0)
-
-    print("Features done")
-
-    print("Beginning hyperparameter optimization")
-
-    if do_gradients:
-        train_targets = train_forces.reshape((-1,))
-        test_targets = test_forces.reshape((-1,))
-    else:
-        train_targets = train_energies
-        #train_targets = torch.concat([train_energies, torch.tensor([0.0])])
-        test_targets = test_energies
-
-    symm = X_train.T @ X_train
-    vec = X_train.T @ train_targets
-    opt_target = []
-    alpha_list = np.linspace(-16.0, -6.0, 41)
-    # alpha_list = np.linspace(-5.0, 5.0, 41)
-    n_feat = X_train.shape[1]
-    print("Number of features: ", n_feat)
-
-    for alpha in alpha_list:
-        #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
-        for i in range(n_feat):
-            symm[i, i] += 10**alpha*LE_reg[i]
-
-        try:
-            #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
-            c = torch.linalg.solve(symm, vec)
-        except Exception as e:
-            print(e)
-            opt_target.append(1e30)
-            continue
-        train_predictions = X_train @ c
-        test_predictions = X_test @ c
-        print(alpha, get_rmse(train_predictions, train_targets).item()/FORCE_WEIGHT, get_mae(train_predictions, train_targets).item()/FORCE_WEIGHT, get_rmse(test_predictions, test_targets).item()/FORCE_WEIGHT, get_mae(test_predictions, test_targets).item()/FORCE_WEIGHT)
-        if opt_target_name == "mae":
-            opt_target.append(get_mae(test_predictions, test_targets).item())
-        else:
-            opt_target.append(get_rmse(test_predictions, test_targets).item())
-
-        for i in range(n_feat):
-            symm[i, i] -= 10.0**alpha*LE_reg[i]
-
-    best_alpha = alpha_list[np.argmin(opt_target)]
-    print(best_alpha, np.min(opt_target))
-
-    for i in range(n_feat):
-        symm[i, i] += 10**best_alpha*LE_reg[i]
-    c = torch.linalg.solve(symm, vec)
-
-    #X_train[-1, :] = torch.sqrt(10**best_alpha*LE_reg)
-    #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
-
-    test_predictions = X_test @ c
-    print("n_train:", n_train, "n_features:", n_feat)
-    print(f"Test error RMSE (F): {get_rmse(test_predictions, test_targets).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions, test_targets).item()/FORCE_WEIGHT}]")
-    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0} %")
-    torch.save(c, "cfile.pt")
-
-    # Speed evaluation
-    # """
-    from ase import io
     length = 1
     dummy_structure = ase.io.read(DATASET_PATH, index = ":" + str(length))
     import time
@@ -303,17 +197,34 @@ def run_fit(parameters):
     n_tries = 10
     for _ in range(n_tries):
         X, dX, LE_reg = get_LE_invariants(dummy_structure)
+        energies = X @ c
         forces = - dX @ c
     time_after = time.time()
-    print()
-    print()
-    print(f"Percentage test RMSE: {get_rmse(test_predictions, test_targets).item()/get_rmse(torch.zeros_like(test_targets), test_targets).item()*100.0} %")
-    print(f"Test error RMSE (atomic units): {get_rmse(test_predictions, test_targets).item()/FORCE_WEIGHT} [MAE: {get_mae(test_predictions, test_targets).item()/FORCE_WEIGHT}]")
-    print(f"Test error RMSE (cm^-1): {get_rmse(test_predictions, test_targets).item()*219474.63/FORCE_WEIGHT} [MAE: {get_mae(test_predictions, test_targets).item()*219474.63/FORCE_WEIGHT}]")
-    print(f"Estimated time per MD step: {(time_after-time_before)/n_tries} s")
-    print()
-    print()
-    # """
+    print((time_after-time_before)/n_tries)
 
     os.remove(rs_spline_path)
     os.remove(spline_path)
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="?"
+    )
+
+    parser.add_argument(
+        "parameters",
+        type=str,
+        help="The file containing the parameters. JSON formatted dictionary.",
+    )
+
+    args = parser.parse_args()
+    evaluate(args.parameters)

@@ -192,7 +192,10 @@ def write_spline(a, n_max, l_max, path):
     # Radial transform
     def radial_transform(r):
         # Function that defines the radial transform x = xi(r).
-        from LE_ACE import factor, factor2
+        try:
+            from LE_ACE import factor, factor2
+        except:
+            factor, factor2 = 3.0, 0.9 
         # x = a*(1.0-np.exp(-factor*np.tan(np.pi*r/(2*a))))
         x = a*(1.0-np.exp(-r/factor))*(1.0-np.exp(-(r/factor2)**2))
         return x
@@ -200,7 +203,10 @@ def write_spline(a, n_max, l_max, path):
     def get_LE_radial_transform(n, l, r):
         # Calculates radially transformed LE radial basis function for a 1D array of values r.
         x = radial_transform(r)
-        from LE_ACE import factor, factor2
+        try:
+            from LE_ACE import factor, factor2
+        except:
+            factor, factor2 = 3.0, 0.9 
         return get_LE_function(n, l, x)*np.exp(-r/factor)
 
     def cutoff_function(r):

@@ -86,10 +86,10 @@ class ClebschGordanReal:
 
         sparse_cg_tensor = self._cg[(lam, l, L)]
 
-        mu_array = sparse_cg_tensor.m1
-        m_array = sparse_cg_tensor.m2
-        M_array = sparse_cg_tensor.M
-        cg_array = sparse_cg_tensor.cg
+        mu_array = sparse_cg_tensor.m1.to(block_1.values.device)
+        m_array = sparse_cg_tensor.m2.to(block_1.values.device)
+        M_array = sparse_cg_tensor.M.to(block_1.values.device)
+        cg_array = sparse_cg_tensor.cg.to(block_1.values.device)
 
         if block_nu.has_gradient("positions"):
             gradients_nu = block_nu.gradient("positions")
@@ -99,6 +99,12 @@ class ClebschGordanReal:
             n_selected_features = selected_features.shape[0]
 
         if self.algorithm == "fast cg":
+
+            new_values = torch.zeros((block_nu.values.shape[0], 2*L+1, selected_features.shape[0]))
+            if block_nu.has_gradient("positions"): 
+                new_derivatives = torch.zeros((gradients_nu.data.shape[0], 3, 2*L+1, selected_features.shape[0]))
+            else:
+                new_derivatives = None
 
             new_values = sparse_accumulation.accumulate_active_dim_middle(
                 block_nu.values[:, :, selected_features[:, 0]].contiguous(),
@@ -114,14 +120,14 @@ class ClebschGordanReal:
 
                 new_derivatives = (sparse_accumulation.accumulate_active_dim_middle(
                     gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
-                    block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
+                    block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1).repeat(1, 3, 1, 1).reshape((-1, 2*l+1, n_selected_features)).contiguous(),
                     M_array, 
                     2*L+1, 
                     mu_array, 
                     m_array, 
                     cg_array
                 ) + sparse_accumulation.accumulate_active_dim_middle(
-                    block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
+                    block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1).repeat(1, 3, 1, 1).reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
                     gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
                     M_array, 
                     2*L+1, 
@@ -129,8 +135,10 @@ class ClebschGordanReal:
                     m_array, 
                     cg_array
                 )).reshape((-1, 3, 2*L+1, n_selected_features))
+                
             else:
                 new_derivatives = None
+
 
         else:  # Python loop algorithm
 

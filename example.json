@@ -11,7 +11,7 @@
     "r_cut": 5.0, 
     "r_cut_rs": 5.0,
     "nu_max": 4,
-    "E_max" : [0.0, 2000.0, 400.0, 250.0, 180.0],
+    "E_max" : [0.0, 2000.0, 300.0, 200.0, 100.0],
     "optimization target": "rmse",
     "factor for radial transform": 3.0,
     "L_max": null
