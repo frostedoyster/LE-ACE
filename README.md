@@ -1,3 +1,3 @@
 # LE-ACE
 
-python -u main.py example.json
+python -u train.py example.json
