@@ -78,6 +78,8 @@ class ClebschGordanReal:
     
     def combine(self, block_nu, block_1, L, selected_features):
 
+        device = block_1.values.device
+
         lam = (block_nu.values.shape[1] - 1) // 2
         l = (block_1.values.shape[1] - 1) // 2
 
@@ -134,9 +136,9 @@ class ClebschGordanReal:
 
         else:  # Python loop algorithm
 
-            new_values = torch.zeros((block_nu.values.shape[0], 2*L+1, selected_features.shape[0]))
+            new_values = torch.zeros((block_nu.values.shape[0], 2*L+1, selected_features.shape[0]), device=device)
             if block_nu.has_gradient("positions"): 
-                new_derivatives = torch.zeros((gradients_nu.data.shape[0], 3, 2*L+1, selected_features.shape[0]))
+                new_derivatives = torch.zeros((gradients_nu.data.shape[0], 3, 2*L+1, selected_features.shape[0]), device=device)
             else:
                 new_derivatives = None
 

@@ -1,4 +1,4 @@
-from utils.LE_expansion import get_LE_expansion, write_spline
+from utils.LE_expansion import get_LE_expansion, get_calculator
 
 import math
 import torch
@@ -42,7 +42,6 @@ def run_fit(parameters):
     nu_max = param_dict["nu_max"]
     E_max_coefficients = param_dict["E_max coefficients"]
     opt_target_name = param_dict["optimization target"]
-    global factor 
     factor = param_dict["factor for radial transform"]
 
     np.random.seed(RANDOM_SEED)
@@ -126,8 +125,7 @@ def run_fit(parameters):
 
     date_time = datetime.now()
     date_time = date_time.strftime("%m-%d-%Y-%H-%M-%S-%f")
-    rs_spline_path = "splines/splines-rs-" + date_time + ".txt"
-    write_spline(r_cut_rs, n_max_rs, 0, rs_spline_path)
+    radial_spectrum_calculator = get_calculator(r_cut_rs, n_max_rs, 0, factor)
 
     if nu_max > 1:
         n_max = np.where(E_nl[:, 0] <= E_max[2])[0][-1] + 1
@@ -148,12 +146,11 @@ def run_fit(parameters):
                     combined_anl[(a, n, l,)] = anl_counter
                     anl_counter += 1
 
-    spline_path = "splines/splines-" + date_time + ".txt"
-    write_spline(r_cut, n_max, l_max, spline_path)
+    spherical_expansion_calculator = get_calculator(r_cut, n_max, l_max, factor)
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
-    cg_object = ClebschGordanReal()
-    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=None)
+    cg_object = ClebschGordanReal(algorithm="python_loops")
+    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=3)
 
     def get_LE_invariants(structures):
 
@@ -161,8 +158,8 @@ def run_fit(parameters):
         comp = get_composition_features(structures, all_species)
         print("Composition features done")
 
-        rs = get_LE_expansion(structures, rs_spline_path, E_nl, E_max[1], r_cut_rs, all_species, rs=True, do_gradients=do_gradients)
-        if nu_max > 1: spherical_expansion = get_LE_expansion(structures, spline_path, E_nl, E_max[2], r_cut, all_species, do_gradients=do_gradients, device=device)
+        rs = get_LE_expansion(structures, radial_spectrum_calculator, E_nl, E_max[1], all_species, rs=True, do_gradients=do_gradients)
+        if nu_max > 1: spherical_expansion = get_LE_expansion(structures, spherical_expansion_calculator, E_nl, E_max[2], all_species, do_gradients=do_gradients, device=device)
 
         invariants = [rs]
 
@@ -303,6 +300,3 @@ def run_fit(parameters):
         print()
         print()
     """
-
-    os.remove(rs_spline_path)
-    os.remove(spline_path)

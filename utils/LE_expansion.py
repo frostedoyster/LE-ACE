@@ -2,7 +2,7 @@ import numpy as np
 import torch
 
 from equistore import TensorMap, Labels, TensorBlock
-from rascaline import SphericalExpansion, SoapRadialSpectrum
+import rascaline
 
 import scipy as sp
 from scipy import optimize
@@ -12,7 +12,11 @@ from scipy.special import spherical_yn as y_l
 from .spherical_bessel_zeros import Jn_zeros
 from scipy.integrate import quadrature
 
-def cut_to_LE(map: TensorMap, E_nl, E_max, all_species, device) -> TensorMap:
+import os 
+import json
+
+
+def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device) -> TensorMap:
     do_gradients = map.block(0).has_gradient("positions")
 
     species_remapping = {}
@@ -64,7 +68,7 @@ def cut_to_LE(map: TensorMap, E_nl, E_max, all_species, device) -> TensorMap:
 
 
 def process_radial_spectrum(map: TensorMap, E_nl, E_max, all_species) -> TensorMap:
-    # Needs to be re-done!!!! WTF IS THIS
+    # TODO: This could really be simplified: no LE-like cutting should be necessary
 
     do_gradients = map.block(0).has_gradient("positions")
 
@@ -117,27 +121,7 @@ def process_radial_spectrum(map: TensorMap, E_nl, E_max, all_species) -> TensorM
         )
 
 
-def get_LE_expansion(structures, spline_file, E_nl, E_max, rcut, all_species, rs=False, do_gradients=False, device="cpu") -> TensorMap:
-
-    n_max = np.where(E_nl[:, 0] <= E_max)[0][-1] + 1
-    l_max = np.where(E_nl[0, :] <= E_max)[0][-1]
-
-    hypers_spherical_expansion = {
-            "cutoff": rcut,
-            "max_radial": int(n_max),
-            "max_angular": int(l_max),
-            "center_atom_weight": 0.0,
-            "radial_basis": {"Tabulated": {"file": spline_file}},
-            "atomic_gaussian_width": 100.0,
-            "cutoff_function": {"Step": {}},
-        }
-
-    if rs: hypers_spherical_expansion.pop("max_angular")
-
-    if rs:
-        calculator = SoapRadialSpectrum(**hypers_spherical_expansion)
-    else:
-        calculator = SphericalExpansion(**hypers_spherical_expansion)
+def get_LE_expansion(structures, calculator, E_nl, E_max, all_species, rs=False, do_gradients=False, device="cpu") -> TensorMap:
 
     gradients = (["positions"] if do_gradients else None)
     spherical_expansion_coefficients = calculator.compute(structures, gradients=gradients)
@@ -146,17 +130,17 @@ def get_LE_expansion(structures, spline_file, E_nl, E_max, rcut, all_species, rs
             names=["species_neighbor"],
             values=np.array(all_species, dtype=np.int32).reshape(-1, 1),
         )
-    spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
+    spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
 
     if rs:
         spherical_expansion_coefficients = process_radial_spectrum(spherical_expansion_coefficients, E_nl, E_max, all_species)
     else:
-        spherical_expansion_coefficients = cut_to_LE(spherical_expansion_coefficients, E_nl, E_max, all_species, device=device)
+        spherical_expansion_coefficients = process_spherical_expansion(spherical_expansion_coefficients, E_nl, E_max, all_species, device=device)
         
     return spherical_expansion_coefficients
 
 
-def write_spline(a, n_max, l_max, path):
+def get_calculator(a, n_max, l_max, factor):
 
     l_big = 50
     n_big = 50
@@ -192,16 +176,14 @@ def write_spline(a, n_max, l_max, path):
     # Radial transform
     def radial_transform(r):
         # Function that defines the radial transform x = xi(r).
-        from LE_ACE import factor, factor2
-        # x = a*(1.0-np.exp(-factor*np.tan(np.pi*r/(2*a))))
-        x = a*(1.0-np.exp(-r/factor))*(1.0-np.exp(-(r/factor2)**2))
+        x = a*(1.0-np.exp(-factor*np.tan(np.pi*r/(2*a))))
+        # x = a*(1.0-np.exp(-r/factor))*(1.0-np.exp(-(r/factor2)**2))
         return x
 
     def get_LE_radial_transform(n, l, r):
         # Calculates radially transformed LE radial basis function for a 1D array of values r.
         x = radial_transform(r)
-        from LE_ACE import factor, factor2
-        return get_LE_function(n, l, x)*np.exp(-r/factor)
+        return get_LE_function(n, l, x) # *np.exp(-r/factor)
 
     def cutoff_function(r):
         cutoff = 3.0
@@ -222,20 +204,9 @@ def write_spline(a, n_max, l_max, path):
 
     # Feed LE (delta) radial spline points to Rust calculator:
 
-    n_spline_points = 1001
-    spline_x = np.linspace(0.0, a, n_spline_points)  # x values
-
     def function_for_splining(n, l, x):
         return get_LE_radial_transform(n, l, x)
         # return get_LE_function(n, l, x)
-
-    spline_f = []
-    for l in range(l_max+1):
-        for n in range(n_max):
-            spline_f_single = function_for_splining(n, l, spline_x)
-            spline_f.append(spline_f_single)
-    spline_f = np.array(spline_f).T
-    spline_f = spline_f.reshape(n_spline_points, l_max+1, n_max)  # f(x) values
 
     def function_for_splining_derivative(n, l, r):
         delta = 1e-6
@@ -243,27 +214,48 @@ def write_spline(a, n_max, l_max, path):
         derivative_at_zero = (function_for_splining(n, l, np.array([delta/10.0])) - function_for_splining(n, l, np.array([0.0]))) / (delta/10.0)
         derivative_last = (function_for_splining(n, l, np.array([a])) - function_for_splining(n, l, np.array([a-delta/10.0]))) / (delta/10.0)
         return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
+    
 
-    spline_df = []
-    for l in range(l_max+1):
-        for n in range(n_max):
-            spline_df_single = function_for_splining_derivative(n, l, spline_x)
-            spline_df.append(spline_df_single)
-    spline_df = np.array(spline_df).T
-    spline_df = spline_df.reshape(n_spline_points, l_max+1, n_max)  # df/dx values
+    spline_path = f"splines/splines-{l_max}-{n_max}-{a}-{factor}.json"
+    if os.path.exists(spline_path):
+        with open(spline_path, 'r') as file:
+            spline_points = json.load(file)
+    else:
+        spline_points = rascaline.generate_splines(
+            function_for_splining,
+            function_for_splining_derivative,
+            n_max,
+            l_max,
+            a,
+            requested_accuracy = 1e-6
+        )
+        with open(spline_path, 'w') as file:
+            json.dump(spline_points, file)
 
-    with open(path, "w") as file:
-        np.savetxt(file, spline_x.flatten(), newline=" ")
-        file.write("\n")
+    print("Number of spline points:", len(spline_points))
 
-    with open(path, "a") as file:
-        np.savetxt(file, (1.0/(4.0*np.pi))*spline_f.flatten(), newline=" ")
-        file.write("\n")
-        np.savetxt(file, (1.0/(4.0*np.pi))*spline_df.flatten(), newline=" ")
-        file.write("\n")
+    hypers_spherical_expansion = {
+            "cutoff": a,
+            "max_radial": int(n_max),
+            "max_angular": int(l_max),
+            "center_atom_weight": 0.0,
+            "radial_basis": {"TabulatedRadialIntegral": {"points": spline_points}},
+            "atomic_gaussian_width": 100.0,
+            "cutoff_function": {
+                "Step": {},
+                #"ShiftedCosine": {"width": 0.5},
+            },
+        }
 
-    # Uncomment this to inspect the spherical expanion
-    """
+    if l_max == 0:
+        hypers_spherical_expansion.pop("max_angular")
+        calculator = rascaline.SoapRadialSpectrum(**hypers_spherical_expansion)
+    else:
+        calculator = rascaline.SphericalExpansion(**hypers_spherical_expansion)
+
+
+    # Uncomment this to inspect the spherical expanaion
+    #"""
     if l_max != 0:
         import ase
 
@@ -280,23 +272,12 @@ def write_spline(a, n_max, l_max, path):
         r = np.linspace(0.1, a-0.001, 1000)
         structures = get_dummy_structures(r)
 
-        hypers_spherical_expansion = {
-            "cutoff": a,
-            "max_radial": int(n_max),
-            "max_angular": int(l_max),
-            "center_atom_weight": 0.0,
-            "radial_basis": {"Tabulated": {"file": path}},
-            "atomic_gaussian_width": 100.0,
-            "cutoff_function": {"Step": {}},
-        }
-
-        calculator = SphericalExpansion(**hypers_spherical_expansion)
         spherical_expansion_coefficients = calculator.compute(structures)
 
         block_C_0 = spherical_expansion_coefficients.block(species_center = 6, spherical_harmonics_l = 0, species_neighbor = 1)
         print(block_C_0.values.shape)
 
-        block_C_0_0 = block_C_0.values[:, :, 6].flatten()
+        block_C_0_0 = block_C_0.values[:, :, 4].flatten()
         spherical_harmonics_0 = 1.0/np.sqrt(4.0*np.pi)
 
         all_species = np.unique(spherical_expansion_coefficients.keys["species_center"])
@@ -309,8 +290,10 @@ def write_spline(a, n_max, l_max, path):
         import matplotlib.pyplot as plt
         plt.plot(r, block_C_0_0/spherical_harmonics_0, label="rascaline output")  # rascaline bug?
         plt.plot([0.0, a], [0.0, 0.0], "black")
-        plt.plot(r, function_for_splining(n=6, l=0, x=r), "--", label="original function")
+        plt.plot(r, function_for_splining(n=4, l=0, x=r), "--", label="original function")
         plt.xlim(0.0, a)
         plt.legend()
-        plt.savefig("radial.pdf")
-    """
+        plt.savefig(f"radial.pdf")
+    #"""
+
+    return calculator
