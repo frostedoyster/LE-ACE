@@ -18,22 +18,21 @@ from utils.sum_like_atoms import sum_like_atoms
 from utils.LE_iterations import LEIterator
 from utils.LE_invariants import LEInvariantCalculator
 
-import os
 import json
 
 torch.set_default_dtype(torch.float64)
 
-def run_fit(parameters):
+def run_fit(parameters, n_train, RANDOM_SEED):
 
     param_dict = json.load(open(parameters, "r"))
-    RANDOM_SEED = param_dict["random seed"]
+    # RANDOM_SEED = param_dict["random seed"]
     BATCH_SIZE = param_dict["batch size"]
     ENERGY_CONVERSION = param_dict["energy conversion"]
     FORCE_CONVERSION = param_dict["force conversion"]
     TARGET_KEY = param_dict["target key"]
     DATASET_PATH = param_dict["dataset path"]
     n_test = param_dict["n_test"]
-    n_train = param_dict["n_train"]
+    # n_train = param_dict["n_train"]
     do_gradients = param_dict["do gradients"]
     global r_cut
     r_cut = param_dict["r_cut"]
@@ -239,7 +238,7 @@ def run_fit(parameters):
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
     opt_target = []
-    alpha_list = np.linspace(-16.0, -6.0, 41)
+    alpha_list = np.linspace(-16.0, -1.0, 61)
     # alpha_list = np.linspace(-5.0, 5.0, 41)
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
@@ -280,6 +279,9 @@ def run_fit(parameters):
     test_predictions = X_test @ c
     print("n_train:", n_train, "n_features:", n_feat)
     print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT}]")
+
+    with open(f"outputs/gold/{n_train}-{RANDOM_SEED}.out", "w") as out:
+        out.write(str(get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()) + "\n")
 
     # Uncomment for speed evaluation
     """

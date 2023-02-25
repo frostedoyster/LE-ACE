@@ -12,5 +12,17 @@ if __name__ == "__main__":
         help="The file containing the parameters. JSON formatted dictionary.",
     )
 
+    parser.add_argument(
+        "n_train",
+        type=int,
+        help="The file containing the parameters. JSON formatted dictionary.",
+    )
+
+    parser.add_argument(
+        "random_seed",
+        type=int,
+        help="The file containing the parameters. JSON formatted dictionary.",
+    )
+
     args = parser.parse_args()
-    run_fit(args.parameters)
+    run_fit(args.parameters, args.n_train, args.random_seed)
