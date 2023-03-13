@@ -13,3 +13,4 @@ outputs/
 inputs/
 venv*
 test*
+*.ipynb

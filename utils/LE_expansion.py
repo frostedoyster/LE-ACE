@@ -140,7 +140,7 @@ def get_LE_expansion(structures, calculator, E_nl, E_max, all_species, rs=False,
     return spherical_expansion_coefficients
 
 
-def get_calculator(a, n_max, l_max, factor):
+def get_calculator(a, n_max, l_max, r0, le_type):
 
     l_big = 50
     n_big = 50
@@ -155,15 +155,19 @@ def get_calculator(a, n_max, l_max, factor):
         # Normalization factor for LE basis functions
         def function_to_integrate_to_get_normalization_factor(x):
             return j_l(l, x)**2 * x**2
-        # print(f"Trying to integrate n={n} l={l}")
-        integral, _ = sp.integrate.quadrature(function_to_integrate_to_get_normalization_factor, 0.0, z_nl[n, l], maxiter=100)
-        return (1.0/z_nl[n, l]**3 * integral)**(-0.5)
+        integral, _ = sp.integrate.quadrature(function_to_integrate_to_get_normalization_factor, 0.0, z_nl[n, l])
+        return ((a/z_nl[n, l])**3 * integral)**(-0.5)
+
+    precomputed_N_nl = np.zeros((n_max, l_max+1))
+    for n in range(n_max):
+        for l in range(l_max+1):
+            precomputed_N_nl[n, l] = N_nl(n, l)
 
     def get_LE_function(n, l, r):
         R = np.zeros_like(r)
         for i in range(r.shape[0]):
             R[i] = R_nl(n, l, r[i])
-        return N_nl(n, l)*R*a**(-1.5)  # This is what makes the results different when you increasing a indefinitely.
+        return precomputed_N_nl[n, l]*R
         '''
         # second kind
         ret = y_l(l, z_nl[n, l]*r/a)
@@ -176,14 +180,20 @@ def get_calculator(a, n_max, l_max, factor):
     # Radial transform
     def radial_transform(r):
         # Function that defines the radial transform x = xi(r).
-        x = a*(1.0-np.exp(-factor*np.tan(np.pi*r/(2*a))))
-        # x = a*(1.0-np.exp(-r/factor))*(1.0-np.exp(-(r/factor2)**2))
+        if le_type == "pure":
+            x = r
+        elif le_type == "paper":
+            x = a*(1.0-np.exp(-np.tan(np.pi*r/(2*a))/r0))
+        elif le_type == "radial_transform":
+            x = a*(1.0-np.exp(-r/r0))#*(1.0-np.exp(-(r/factor2)**2))
+        else:
+            raise NotImplementedError("LE types can only be pure, paper, and radial_transform")
         return x
 
     def get_LE_radial_transform(n, l, r):
         # Calculates radially transformed LE radial basis function for a 1D array of values r.
         x = radial_transform(r)
-        return get_LE_function(n, l, x) # *np.exp(-r/factor)
+        return get_LE_function(n, l, x) # *np.exp(-r/r0)
 
     def cutoff_function(r):
         cutoff = 3.0
@@ -216,7 +226,7 @@ def get_calculator(a, n_max, l_max, factor):
         return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
     
 
-    spline_path = f"splines/splines-{l_max}-{n_max}-{a}-{factor}.json"
+    spline_path = f"splines/splines-{l_max}-{n_max}-{a}-{r0}-{le_type}.json"
     if os.path.exists(spline_path):
         with open(spline_path, 'r') as file:
             spline_points = json.load(file)
@@ -241,11 +251,16 @@ def get_calculator(a, n_max, l_max, factor):
             "center_atom_weight": 0.0,
             "radial_basis": {"TabulatedRadialIntegral": {"points": spline_points}},
             "atomic_gaussian_width": 100.0,
-            "cutoff_function": {
-                "Step": {},
-                #"ShiftedCosine": {"width": 0.5},
-            },
         }
+    
+    if le_type == "pure":
+        hypers_spherical_expansion["cutoff_function"] = {"ShiftedCosine": {"width": 1.0}}
+    elif le_type == "paper":
+        hypers_spherical_expansion["cutoff_function"] = {"Step": {}}
+    elif le_type == "radial_transform":
+        hypers_spherical_expansion["cutoff_function"] = {"ShiftedCosine": {"width": 1.0}}
+    else:
+        raise NotImplementedError("LE types can only be pure, paper, and radial_transform")
 
     if l_max == 0:
         hypers_spherical_expansion.pop("max_angular")
@@ -254,7 +269,7 @@ def get_calculator(a, n_max, l_max, factor):
         calculator = rascaline.SphericalExpansion(**hypers_spherical_expansion)
 
 
-    # Uncomment this to inspect the spherical expanaion
+    # Uncomment this to inspect the spherical expansion
     """
     if l_max != 0:
         import ase

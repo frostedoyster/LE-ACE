@@ -19,9 +19,14 @@ def Jn_zeros(n, nt):
   return (zerosj)
 
 
-def get_laplacian_eigenvalues(n_big, l_big):
+def get_laplacian_eigenvalues(n_big, l_big, cost_trade_off):
 
     z_ln = Jn_zeros(l_big, n_big)
     z_nl = z_ln.T
+    E_nl = z_nl**2
 
-    return z_nl**2
+    if cost_trade_off:
+        for l in range(l_big+1):
+           E_nl[:, l] *= 2*l+1
+
+    return E_nl

@@ -12,7 +12,7 @@ from utils.error_measures import get_rmse, get_mae
 from utils.cg import ClebschGordanReal
 from utils.composition import get_composition_features
 from utils.lexicographic_multiplicities import apply_multiplicities
-from utils.spherical_bessel_zeros import Jn_zeros, get_laplacian_eigenvalues
+from utils.spherical_bessel_zeros import get_laplacian_eigenvalues
 from utils.sum_like_atoms import sum_like_atoms
 
 from utils.LE_iterations import LEIterator
@@ -42,6 +42,9 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     E_max_coefficients = param_dict["E_max coefficients"]
     opt_target_name = param_dict["optimization target"]
     factor = param_dict["factor for radial transform"]
+    cost_trade_off = param_dict["cost_trade_off"]
+    le_type = param_dict["cost_trade_off"]
+    dataset_style = param_dict["dataset_style"]
 
     np.random.seed(RANDOM_SEED)
     print(f"Random seed: {RANDOM_SEED}")
@@ -94,6 +97,9 @@ def run_fit(parameters, n_train, RANDOM_SEED):
             nu_max = iota-1
             break
 
+    if nu_max < 2:
+        raise ValueError("Trying to use ACE with nu_max < 2? Why?")
+
     if "rmd17" in DATASET_PATH:
         train_slice = str(0) + ":" + str(n_train)
         test_slice = str(0) + ":" + str(n_test)
@@ -114,38 +120,42 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
         test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
 
-    E_nl = get_laplacian_eigenvalues(50, 50)
-
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
     print(f"All species: {all_species}")
 
+
+
+    cost_trade_off = False
+    le_type = "radial_transform"
+    dataset_style = "md"
+    E_nl = get_laplacian_eigenvalues(50, 50, cost_trade_off)
     n_max_rs = np.where(E_nl[:, 0] <= E_max[1])[0][-1] + 1
     print(f"Radial spectrum: n_max = {n_max_rs}")
 
-    date_time = datetime.now()
-    date_time = date_time.strftime("%m-%d-%Y-%H-%M-%S-%f")
-    radial_spectrum_calculator = get_calculator(r_cut_rs, n_max_rs, 0, factor)
+    n_max = np.where(E_nl[:, 0] <= E_max[2])[0][-1] + 1
+    l_max = np.where(E_nl[0, :] <= E_max[2])[0][-1]
+    print(f"Spherical expansion: n_max = {n_max}, l_max = {l_max}")
 
-    if nu_max > 1:
-        n_max = np.where(E_nl[:, 0] <= E_max[2])[0][-1] + 1
-        l_max = np.where(E_nl[0, :] <= E_max[2])[0][-1]
-        print(f"Spherical expansion: n_max = {n_max}, l_max = {l_max}")
+    n_max_l = []
+    for l in range(l_max+1):
+        n_max_l.append(np.where(E_nl[:, l] <= E_max[2])[0][-1] + 1)
 
-        # anl counter:
-        a_max = len(all_species)
-        n_max_l = []
-        a_i = all_species[0]
+    radial_spectrum_calculator = get_calculator(r_cut_rs, n_max_rs, 0, factor, le_type)
+    spherical_expansion_calculator = get_calculator(r_cut, n_max, l_max, factor, le_type)
+
+
+
+
+
+    # anl counter:
+    a_max = len(all_species)
+    combined_anl = {}
+    anl_counter = 0
+    for a in range(a_max):
         for l in range(l_max+1):
-            n_max_l.append(np.where(E_nl[:, l] <= E_max[2])[0][-1] + 1)
-        combined_anl = {}
-        anl_counter = 0
-        for a in range(a_max):
-            for l in range(l_max+1):
-                for n in range(n_max_l[l]):
-                    combined_anl[(a, n, l,)] = anl_counter
-                    anl_counter += 1
-
-    spherical_expansion_calculator = get_calculator(r_cut, n_max, l_max, factor)
+            for n in range(n_max_l[l]):
+                combined_anl[(a, n, l,)] = anl_counter
+                anl_counter += 1
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
     cg_object = ClebschGordanReal(algorithm="python_loops")
@@ -177,7 +187,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
             equivariants_nu = equivariant_calculator(equivariants_nu_minus_one, spherical_expansion, E_max[nu+1])
             equivariants_nu_minus_one = equivariants_nu
 
-        X, dX, LE_reg = sum_like_atoms(comp, invariants, all_species, E_nl)
+        X, dX, LE_reg = sum_like_atoms(comp, invariants, all_species, E_nl, dataset_style)
         return X, dX, LE_reg
 
 

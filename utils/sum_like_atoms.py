@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from .LE_regularization import get_LE_regularization
 
-def sum_like_atoms(comp, invariants, species, E_nl):
+def sum_like_atoms(comp, invariants, species, E_nl, dataset_style):
 
     n_structures = len(comp.samples["structure"])
     n_features = [invariants_nu.block(0).values.shape[1] for invariants_nu in invariants]  # Assuming same number of features for each center block at a given correlation order.
@@ -60,15 +60,18 @@ def sum_like_atoms(comp, invariants, species, E_nl):
                     d_features_current_center_species[force_centers_dict[force_centers[i]], :, :] += center_d_features[i, :, :]
 
                 d_features.append(d_features_current_center_species)
-    #"""
-    comp = comp.values
-    LE_reg_comp = torch.tensor([0.0]*len(species))
-    # LE_reg_comp = torch.tensor([1e-4]*len(species))  # this seems to work ok; needs more testing 
-    """
-    comp = torch.ones(features[0].shape[0], 1)  # MD-like
-    LE_reg_comp = torch.tensor([0.0])
-    if len(d_features) != 0: d_comp = torch.zeros((d_features[0].shape[0], 3, 1))
-    """
+    
+    if dataset_style == "mixed"
+        comp = comp.values
+        LE_reg_comp = torch.tensor([0.0]*len(species))
+        # LE_reg_comp = torch.tensor([1e-4]*len(species))  # this seems to work ok; needs more testing 
+    elif dataset_style == "MD":
+        comp = torch.ones(features[0].shape[0], 1)  # MD-like
+        LE_reg_comp = torch.tensor([0.0])
+        if len(d_features) != 0: d_comp = torch.zeros((d_features[0].shape[0], 3, 1))
+    else:
+        raise NotImplementedError("The dataset_style must be either MD or mixed")
+
     X = torch.concat([comp] + features, dim = -1)
     LE_reg = torch.concat([LE_reg_comp] + LE_reg, dim = -1)
     
