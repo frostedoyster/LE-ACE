@@ -155,7 +155,7 @@ def get_calculator(a, n_max, l_max, r0, le_type):
         # Normalization factor for LE basis functions
         def function_to_integrate_to_get_normalization_factor(x):
             return j_l(l, x)**2 * x**2
-        integral, _ = sp.integrate.quadrature(function_to_integrate_to_get_normalization_factor, 0.0, z_nl[n, l])
+        integral, _ = sp.integrate.quadrature(function_to_integrate_to_get_normalization_factor, 0.0, z_nl[n, l], maxiter=100)
         return ((a/z_nl[n, l])**3 * integral)**(-0.5)
 
     precomputed_N_nl = np.zeros((n_max, l_max+1))
@@ -183,7 +183,7 @@ def get_calculator(a, n_max, l_max, r0, le_type):
         if le_type == "pure":
             x = r
         elif le_type == "paper":
-            x = a*(1.0-np.exp(-np.tan(np.pi*r/(2*a))/r0))
+            x = a*(1.0-np.exp(-r0*np.tan(np.pi*r/(2*a))))
         elif le_type == "radial_transform":
             x = a*(1.0-np.exp(-r/r0))#*(1.0-np.exp(-(r/factor2)**2))
         else:

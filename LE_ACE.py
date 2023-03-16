@@ -43,7 +43,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     opt_target_name = param_dict["optimization target"]
     factor = param_dict["factor for radial transform"]
     cost_trade_off = param_dict["cost_trade_off"]
-    le_type = param_dict["cost_trade_off"]
+    le_type = param_dict["le_type"]
     dataset_style = param_dict["dataset_style"]
 
     np.random.seed(RANDOM_SEED)
@@ -123,11 +123,6 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
     print(f"All species: {all_species}")
 
-
-
-    cost_trade_off = False
-    le_type = "radial_transform"
-    dataset_style = "md"
     E_nl = get_laplacian_eigenvalues(50, 50, cost_trade_off)
     n_max_rs = np.where(E_nl[:, 0] <= E_max[1])[0][-1] + 1
     print(f"Radial spectrum: n_max = {n_max_rs}")
@@ -143,10 +138,6 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     radial_spectrum_calculator = get_calculator(r_cut_rs, n_max_rs, 0, factor, le_type)
     spherical_expansion_calculator = get_calculator(r_cut, n_max, l_max, factor, le_type)
 
-
-
-
-
     # anl counter:
     a_max = len(all_species)
     combined_anl = {}
@@ -158,8 +149,9 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 anl_counter += 1
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
-    cg_object = ClebschGordanReal(algorithm="python_loops")
-    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object, L_max=3)
+    algo = "fast cg" if device == "cpu" else "python loops"
+    cg_object = ClebschGordanReal(algorithm=algo)
+    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object)  # L_max=3
 
     def get_LE_invariants(structures):
 

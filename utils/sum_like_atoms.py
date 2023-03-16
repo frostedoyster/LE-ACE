@@ -60,8 +60,8 @@ def sum_like_atoms(comp, invariants, species, E_nl, dataset_style):
                     d_features_current_center_species[force_centers_dict[force_centers[i]], :, :] += center_d_features[i, :, :]
 
                 d_features.append(d_features_current_center_species)
-    
-    if dataset_style == "mixed"
+
+    if dataset_style == "mixed":
         comp = comp.values
         LE_reg_comp = torch.tensor([0.0]*len(species))
         # LE_reg_comp = torch.tensor([1e-4]*len(species))  # this seems to work ok; needs more testing 
