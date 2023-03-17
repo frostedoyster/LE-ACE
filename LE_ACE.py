@@ -1,8 +1,9 @@
 from utils.LE_expansion import get_LE_expansion, get_calculator
 
 import math
-import torch
 import numpy as np
+import torch
+import equistore
 from datetime import datetime
 import ase
 from ase import io
@@ -17,6 +18,7 @@ from utils.sum_like_atoms import sum_like_atoms
 
 from utils.LE_iterations import LEIterator
 from utils.LE_invariants import LEInvariantCalculator
+from utils.LE_regularization import get_LE_regularization
 
 import json
 
@@ -149,8 +151,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 anl_counter += 1
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
-    algo = "fast cg" if device == "cpu" else "python loops"
-    cg_object = ClebschGordanReal(algorithm=algo)
+    cg_object = ClebschGordanReal(algorithm="fast cg")
     equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object)  # L_max=3
 
     def get_LE_invariants(structures):
@@ -179,8 +180,8 @@ def run_fit(parameters, n_train, RANDOM_SEED):
             equivariants_nu = equivariant_calculator(equivariants_nu_minus_one, spherical_expansion, E_max[nu+1])
             equivariants_nu_minus_one = equivariants_nu
 
-        X, dX, LE_reg = sum_like_atoms(comp, invariants, all_species, E_nl, dataset_style)
-        return X, dX, LE_reg
+        X = sum_like_atoms(invariants)
+        return comp, X
 
 
     # Divide training and test set into batches (to limit memory usage):
@@ -196,34 +197,108 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     train_structures = get_batches(train_structures, BATCH_SIZE)
     test_structures = get_batches(test_structures, BATCH_SIZE)
 
+    train_comp = []
+    if do_gradients: train_dcomp = []
     X_train = []
-    if do_gradients: dX_train = []
     for i_batch, batch in enumerate(train_structures):
         print(f"DOING TRAIN BATCH {i_batch+1} out of {len(train_structures)}")
-        X, dX, LE_reg = get_LE_invariants(batch)
-        X_train.append(X)
-        if do_gradients: dX_train.append(-FORCE_WEIGHT*dX.reshape(dX.shape[0]*3, dX.shape[2]))  # note the minus sign
+        comp, X = get_LE_invariants(batch)
+
+        if dataset_style == "mixed":
+            comp = comp.values.to(device)
+        elif dataset_style == "MD":
+            comp = torch.ones((X[0].block(0).values.shape[0], 1))
+        else:
+            raise NotImplementedError("The dataset_style must be either MD or mixed")
+        train_comp.append(comp)
+      
+        if do_gradients:    
+            if dataset_style == "mixed":
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, len(all_species)))
+            elif dataset_style == "MD":
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, 1))
+            else:
+                raise NotImplementedError("The dataset_style must be either MD or mixed")
+            train_dcomp.append(dcomp)
+
+        moved_X = []
+        for tmap in X:
+            moved_tmap = tmap.keys_to_properties(keys_to_move="a_i")
+            moved_X.append(moved_tmap)
+        # The equistore to function here would allow for much better memory management
+        X_train.append(moved_X)
+
+    properties = [X_train[0][nu-1].block().properties for nu in range(nu_max)]
+
+    if dataset_style == "mixed":
+        LE_reg_comp = torch.tensor([0.0]*len(all_species))
+        # LE_reg_comp = torch.tensor([1e-4]*len(species))  # this seems to work ok; needs more testing 
+    elif dataset_style == "MD":
+        LE_reg_comp = torch.tensor([0.0])
+    else:
+        raise NotImplementedError("The dataset_style must be either MD or mixed")
+
+    X_train_batches = []
+    if do_gradients: dX_train_batches = []
+    for i_batch, batch in enumerate(X_train):
+        processed_batch = [batch[nu-1].block().values.cpu() for nu in range(nu_max)]
+        processed_batch = torch.concat([train_comp[i_batch]]+processed_batch, dim=-1)
+        X_train_batches.append(processed_batch)
+        if do_gradients:
+            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").data.cpu().reshape(batch[nu-1].block().gradient("positions").data.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(nu_max)]
+            d_processed_batch = torch.concat([train_dcomp[i_batch]]+d_processed_batch, dim=-1)
+            dX_train_batches.append(d_processed_batch)
 
     if do_gradients:
-        X_train = torch.concat(X_train + dX_train, dim = 0)
+        X_train = torch.concat(X_train_batches + dX_train_batches, dim = 0)
     else:
-        X_train = torch.concat(X_train, dim = 0)
-        # X_train = torch.concat(X_train + [torch.zeros((1, X_train[0].shape[1]))], dim = 0)
-    #X_train = torch.concat([X_train, torch.zeros((1, X_train.shape[1]))], dim = 0)
-    #print(X_train.shape)
+        X_train = torch.concat(X_test_batches, dim = 0)
 
+    test_comp = []
+    if do_gradients: test_dcomp = []
     X_test = []
-    if do_gradients: dX_test = []
     for i_batch, batch in enumerate(test_structures):
         print(f"DOING TEST BATCH {i_batch+1} out of {len(test_structures)}")
-        X, dX, LE_reg = get_LE_invariants(batch)
-        X_test.append(X)
-        if do_gradients: dX_test.append(-FORCE_WEIGHT*dX.reshape(dX.shape[0]*3, dX.shape[2]))  # note the minus sign
+        comp, X = get_LE_invariants(batch)
+
+        if dataset_style == "mixed":
+            comp = comp.values.to(device)
+        elif dataset_style == "MD":
+            comp = torch.ones((X[0].block(0).values.shape[0], 1))
+        else:
+            raise NotImplementedError("The dataset_style must be either MD or mixed")
+        test_comp.append(comp)
+      
+        if do_gradients:    
+            if dataset_style == "mixed":
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, len(all_species)))
+            elif dataset_style == "MD":
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, 1))
+            else:
+                raise NotImplementedError("The dataset_style must be either MD or mixed")
+            test_dcomp.append(dcomp)
+
+        moved_X = []
+        for tmap in X:
+            moved_tmap = tmap.keys_to_properties(keys_to_move="a_i")
+            moved_X.append(moved_tmap)
+        X_test.append(moved_X)
+
+    X_test_batches = []
+    if do_gradients: dX_test_batches = []
+    for i_batch, batch in enumerate(X_test):
+        processed_batch = [batch[nu-1].block().values.cpu() for nu in range(nu_max)]
+        processed_batch = torch.concat([test_comp[i_batch]]+processed_batch, dim=-1)
+        X_test_batches.append(processed_batch)
+        if do_gradients:
+            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").data.cpu().reshape(batch[nu-1].block().gradient("positions").data.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(nu_max)]
+            d_processed_batch = torch.concat([test_dcomp[i_batch]]+d_processed_batch, dim=-1)
+            dX_test_batches.append(d_processed_batch)
 
     if do_gradients:
-        X_test = torch.concat(X_test + dX_test, dim = 0)
+        X_test = torch.concat(X_test_batches + dX_test_batches, dim = 0)
     else:
-        X_test = torch.concat(X_test, dim = 0)
+        X_test = torch.concat(X_test_batches, dim = 0)
 
     print("Features done")
 
@@ -239,37 +314,69 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
-    opt_target = []
-    alpha_list = np.linspace(-16.0, -1.0, 61)
+    alpha_list = np.linspace(-15.0, -5.0, 21)
     # alpha_list = np.linspace(-5.0, 5.0, 41)
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
 
-    for alpha in alpha_list:
-        #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
-        for i in range(n_feat):
-            symm[i, i] += 10**alpha*LE_reg[i]
+    best_opt_target = 1e30
+    for beta in [-2.0, -1.0, 0, 1.0, 2.0]:
 
-        try:
-            #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
-            c = torch.linalg.solve(symm, vec)
-        except Exception as e:
-            print(e)
-            opt_target.append(1e30)
-            continue
-        train_predictions = X_train @ c
-        test_predictions = X_test @ c
-        print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
-        if opt_target_name == "mae":
-            opt_target.append(get_mae(test_predictions[:n_test], test_targets[:n_test]).item())
-        else:
-            opt_target.append(get_rmse(test_predictions[:n_test], test_targets[:n_test]).item())
+        print("beta=", beta)
 
-        for i in range(n_feat):
-            symm[i, i] -= 10.0**alpha*LE_reg[i]
+        LE_reg = []
+        for nu in range(nu_max+1):
+            if nu > 0:
+                LE_reg.append(
+                    get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, beta)
+                )
+            else:
+                LE_reg.append(LE_reg_comp)
+        LE_reg = torch.concat(LE_reg)
+
+        for alpha in alpha_list:
+            #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
+            for i in range(n_feat):
+                symm[i, i] += 10**alpha*LE_reg[i]
+
+            try:
+                #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
+                c = torch.linalg.solve(symm, vec)
+            except Exception as e:
+                print(e)
+                opt_target.append(1e30)
+                for i in range(n_feat):
+                    symm[i, i] -= 10.0**alpha*LE_reg[i]
+                continue
+            train_predictions = X_train @ c
+            test_predictions = X_test @ c
+
+            print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
+            if opt_target_name == "mae":
+                opt_target = get_mae(test_predictions[:n_test], test_targets[:n_test]).item()
+            else:
+                opt_target = get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()
+
+            if opt_target < best_opt_target:
+                best_opt_target = opt_target
+                best_alpha = alpha
+                best_beta = beta
+
+            for i in range(n_feat):
+                symm[i, i] -= 10.0**alpha*LE_reg[i]
 
     best_alpha = alpha_list[np.argmin(opt_target)]
-    print(best_alpha, np.min(opt_target))
+    print("Best parameters:", best_alpha, best_beta)
+
+    LE_reg = []
+    for nu in range(nu_max+1):
+        if nu > 0:
+            LE_reg.append(
+                get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, best_beta)
+            )
+        else:
+            LE_reg.append(LE_reg_comp)
+    LE_reg = torch.concat(LE_reg)
 
     for i in range(n_feat):
         symm[i, i] += 10**best_alpha*LE_reg[i]

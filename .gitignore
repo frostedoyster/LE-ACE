@@ -14,3 +14,4 @@ inputs/
 venv*
 test*
 *.ipynb
+*physical*

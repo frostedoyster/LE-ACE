@@ -88,10 +88,10 @@ class ClebschGordanReal:
 
         sparse_cg_tensor = self._cg[(lam, l, L)]
 
-        mu_array = sparse_cg_tensor.m1
-        m_array = sparse_cg_tensor.m2
-        M_array = sparse_cg_tensor.M
-        cg_array = sparse_cg_tensor.cg
+        mu_array = sparse_cg_tensor.m1.to(device)
+        m_array = sparse_cg_tensor.m2.to(device)
+        M_array = sparse_cg_tensor.M.to(device)
+        cg_array = sparse_cg_tensor.cg.to(device)
 
         if block_nu.has_gradient("positions"):
             gradients_nu = block_nu.gradient("positions")
@@ -102,37 +102,73 @@ class ClebschGordanReal:
 
         if self.algorithm == "fast cg":
 
-            new_values = sparse_accumulation.accumulate_active_dim_middle(
-                block_nu.values[:, :, selected_features[:, 0]].contiguous(),
-                block_1.values[:, :, selected_features[:, 1]].contiguous(), 
-                M_array, 
-                2*L+1, 
-                mu_array, 
-                m_array, 
-                cg_array
-            )
+            if device == "cpu":
 
-            if block_nu.has_gradient("positions"):
-
-                new_derivatives = (sparse_accumulation.accumulate_active_dim_middle(
-                    gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
-                    block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
+                new_values = sparse_accumulation.accumulate_active_dim_middle(
+                    block_nu.values[:, :, selected_features[:, 0]].contiguous(),
+                    block_1.values[:, :, selected_features[:, 1]].contiguous(), 
                     M_array, 
                     2*L+1, 
                     mu_array, 
                     m_array, 
                     cg_array
-                ) + sparse_accumulation.accumulate_active_dim_middle(
-                    block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
-                    gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
+                )
+
+                if block_nu.has_gradient("positions"):
+
+                    new_derivatives = (sparse_accumulation.accumulate_active_dim_middle(
+                        gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
+                        block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
+                        M_array, 
+                        2*L+1, 
+                        mu_array, 
+                        m_array, 
+                        cg_array
+                    ) + sparse_accumulation.accumulate_active_dim_middle(
+                        block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
+                        gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
+                        M_array, 
+                        2*L+1, 
+                        mu_array, 
+                        m_array, 
+                        cg_array
+                    )).reshape((-1, 3, 2*L+1, n_selected_features))
+                else:
+                    new_derivatives = None
+
+            else:  # GPU device
+
+                new_values = sparse_accumulation.accumulate(
+                    block_nu.values[:, :, selected_features[:, 0]].swapaxes(1, 2).contiguous(),
+                    block_1.values[:, :, selected_features[:, 1]].swapaxes(1, 2).contiguous(), 
                     M_array, 
                     2*L+1, 
                     mu_array, 
                     m_array, 
                     cg_array
-                )).reshape((-1, 3, 2*L+1, n_selected_features))
-            else:
-                new_derivatives = None
+                ).swapaxes(1, 2)
+
+                if block_nu.has_gradient("positions"):
+
+                    new_derivatives = (sparse_accumulation.accumulate(
+                        gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                        block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                        M_array, 
+                        2*L+1, 
+                        mu_array, 
+                        m_array, 
+                        cg_array
+                    ) + sparse_accumulation.accumulate(
+                        block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                        gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                        M_array, 
+                        2*L+1, 
+                        mu_array, 
+                        m_array, 
+                        cg_array
+                    )).swapaxes(1, 2).reshape((-1, 3, 2*L+1, n_selected_features))
+                else:
+                    new_derivatives = None
 
         else:  # Python loop algorithm
 

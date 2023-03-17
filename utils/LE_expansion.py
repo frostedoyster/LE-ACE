@@ -214,16 +214,22 @@ def get_calculator(a, n_max, l_max, r0, le_type):
 
     # Feed LE (delta) radial spline points to Rust calculator:
 
-    def function_for_splining(n, l, x):
-        return get_LE_radial_transform(n, l, x)
-        # return get_LE_function(n, l, x)
+    if le_type == "physical":
+        
+        from physical_LE import function_for_splining, function_for_splining_derivative
 
-    def function_for_splining_derivative(n, l, r):
-        delta = 1e-6
-        all_derivatives_except_first_and_last = (function_for_splining(n, l, r[1:-1]+delta) - function_for_splining(n, l, r[1:-1]-delta)) / (2.0*delta)
-        derivative_at_zero = (function_for_splining(n, l, np.array([delta/10.0])) - function_for_splining(n, l, np.array([0.0]))) / (delta/10.0)
-        derivative_last = (function_for_splining(n, l, np.array([a])) - function_for_splining(n, l, np.array([a-delta/10.0]))) / (delta/10.0)
-        return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
+    else:
+
+        def function_for_splining(n, l, x):
+            return get_LE_radial_transform(n, l, x)
+            # return get_LE_function(n, l, x)
+
+        def function_for_splining_derivative(n, l, r):
+            delta = 1e-6
+            all_derivatives_except_first_and_last = (function_for_splining(n, l, r[1:-1]+delta) - function_for_splining(n, l, r[1:-1]-delta)) / (2.0*delta)
+            derivative_at_zero = (function_for_splining(n, l, np.array([delta/10.0])) - function_for_splining(n, l, np.array([0.0]))) / (delta/10.0)
+            derivative_last = (function_for_splining(n, l, np.array([a])) - function_for_splining(n, l, np.array([a-delta/10.0]))) / (delta/10.0)
+            return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
     
 
     spline_path = f"splines/splines-{l_max}-{n_max}-{a}-{r0}-{le_type}.json"
