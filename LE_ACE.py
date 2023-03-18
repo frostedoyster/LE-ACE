@@ -365,7 +365,6 @@ def run_fit(parameters, n_train, RANDOM_SEED):
             for i in range(n_feat):
                 symm[i, i] -= 10.0**alpha*LE_reg[i]
 
-    best_alpha = alpha_list[np.argmin(opt_target)]
     print("Best parameters:", best_alpha, best_beta)
 
     LE_reg = []

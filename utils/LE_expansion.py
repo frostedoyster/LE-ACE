@@ -12,6 +12,8 @@ from scipy.special import spherical_yn as y_l
 from .spherical_bessel_zeros import Jn_zeros
 from scipy.integrate import quadrature
 
+from .physical_LE import get_coefficients
+
 import os 
 import json
 
@@ -215,13 +217,78 @@ def get_calculator(a, n_max, l_max, r0, le_type):
     # Feed LE (delta) radial spline points to Rust calculator:
 
     if le_type == "physical":
+
+        coeffs = get_coefficients(l_max, n_max, r0)
         
-        from physical_LE import function_for_splining, function_for_splining_derivative
+        z_ln = Jn_zeros(l_max+1, n_max+10)
+        z_nl = z_ln.T
+
+        def R_nl(n, l, r):
+            return j_l(l, z_nl[n, l]*r/1.0)
+
+        def dRnl_dr(n, l, r):
+            return z_nl[n, l]/1.0*j_l(l, z_nl[n, l]*r/1.0, derivative=True)
+
+        def d2Rnl_dr2(n, l, r):
+            return (z_nl[n, l]/1.0)**2 * (
+                l*(j_l(l, z_nl[n, l]*r/1.0, derivative=True)/(z_nl[n, l]*r/1.0) - j_l(l, z_nl[n, l]*r/1.0)/(z_nl[n, l]*r/1.0)**2) - j_l(l+1, z_nl[n, l]*r/1.0, derivative=True)
+            )
+
+        def N_nl(n, l):
+            # Normalization factor for LE basis functions
+            def function_to_integrate_to_get_normalization_factor(x):
+                return j_l(l, x)**2 * x**2
+            integral, _ = sp.integrate.quadrature(function_to_integrate_to_get_normalization_factor, 0.0, z_nl[n, l], maxiter=100)
+            return ((1.0/z_nl[n, l])**3 * integral)**(-0.5)
+
+        precomputed_N_nl = np.zeros((n_max+10, l_max+1))
+        for n in range(n_max):
+            for l in range(l_max+1):
+                precomputed_N_nl[n, l] = N_nl(n, l)
+
+        def get_LE_function(n, l, r):
+            R = R_nl(n, l, r)
+            return precomputed_N_nl[n, l]*R
+
+        def get_LE_function_derivative(n, l, r):
+            dR = dRnl_dr(n, l, r)
+            return precomputed_N_nl[n, l]*dR
+
+        def get_LE_function_second_derivative(n, l, r):
+            d2R = d2Rnl_dr2(n, l, r)
+            return precomputed_N_nl[n, l]*d2R
+
+
+        # normalization check:
+        def what(x):
+            return get_LE_function(0, 0, x)**2 * x**2
+        assert np.abs(1.0-sp.integrate.quadrature(what, 0.0, 1.0)[0]) < 1e-6
+        def what(x):
+            return get_LE_function(0, 0, x)*get_LE_function(4, 0, x) * x**2
+        assert np.abs(sp.integrate.quadrature(what, 0.0, 1.0)[0]) < 1e-6
+
+        def b(l, n, x):
+            return get_LE_function(n, l, x)
+
+        def db(l, n, x):
+            return get_LE_function_derivative(n, l, x)
+
+        def function_for_splining(n, l, r):
+            ret = np.zeros_like(r)
+            for m in range(n_max+10):
+                ret += coeffs[l, n, m]*b(l, m, 1-np.exp(-r/r0))
+            return ret
+
+        def function_for_splining_derivative(n, l, r):
+            ret = np.zeros_like(r)
+            for m in range(n_max+10):
+                ret += coeffs[l, n, m]*db(l, m, 1-np.exp(-r/r0))*np.exp(-r/r0)/r0
+            return ret
 
     else:
 
-        def function_for_splining(n, l, x):
-            return get_LE_radial_transform(n, l, x)
+        def function_for_splining(n, l, r):
+            return get_LE_radial_transform(n, l, r)
             # return get_LE_function(n, l, x)
 
         def function_for_splining_derivative(n, l, r):
@@ -265,6 +332,8 @@ def get_calculator(a, n_max, l_max, r0, le_type):
         hypers_spherical_expansion["cutoff_function"] = {"Step": {}}
     elif le_type == "radial_transform":
         hypers_spherical_expansion["cutoff_function"] = {"ShiftedCosine": {"width": 1.0}}
+    elif le_type == "physical":
+        hypers_spherical_expansion["cutoff_function"] = {"ShiftedCosine": {"width": 1.0}}
     else:
         raise NotImplementedError("LE types can only be pure, paper, and radial_transform")
 
@@ -296,7 +365,7 @@ def get_calculator(a, n_max, l_max, r0, le_type):
         spherical_expansion_coefficients = calculator.compute(structures)
 
         block_C_0 = spherical_expansion_coefficients.block(species_center = 6, spherical_harmonics_l = 0, species_neighbor = 1)
-        print(block_C_0.values.shape)
+        # print(block_C_0.values.shape)
 
         block_C_0_0 = block_C_0.values[:, :, 4].flatten()
         spherical_harmonics_0 = 1.0/np.sqrt(4.0*np.pi)
@@ -311,10 +380,10 @@ def get_calculator(a, n_max, l_max, r0, le_type):
         import matplotlib.pyplot as plt
         plt.plot(r, block_C_0_0/spherical_harmonics_0, label="rascaline output")  # rascaline bug?
         plt.plot([0.0, a], [0.0, 0.0], "black")
-        plt.plot(r, function_for_splining(n=4, l=0, x=r), "--", label="original function")
+        plt.plot(r, function_for_splining(n=4, l=0, r=r), "--", label="original function")
         plt.xlim(0.0, a)
         plt.legend()
-        plt.savefig(f"radial.pdf")
+        plt.savefig("radial.pdf")
     """
 
     return calculator
