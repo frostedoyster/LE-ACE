@@ -7,8 +7,9 @@ import sparse_accumulation
 SparseCGTensor = namedtuple("SparseCGTensor", "m1 m2 M cg")
 
 class ClebschGordanReal:
-    def __init__(self, algorithm = "fast cg"):
+    def __init__(self, device, algorithm = "python loops"):
         self._cg = {}
+        self.device = device
         self.algorithm = algorithm
 
 
@@ -16,12 +17,10 @@ class ClebschGordanReal:
         # print(f"Adding new CGs with l1={l1}, l2={l2}, L={L}")
 
         if self._cg is None: 
-            print("Trying to add CGs when not initialized... exiting")
-            exit()
+            raise ValueError("Trying to add CGs when not initialized... exiting")
 
         if (l1, l2, L) in self._cg: 
-            print("Trying to add CGs that are already present... exiting")
-            exit()
+            raise ValueError("Trying to add CGs that are already present... exiting")
 
         maxx = max(l1, max(l2, L))
 
@@ -51,34 +50,40 @@ class ClebschGordanReal:
         else:
             rcg = np.imag(real_cg)
 
-        # Note that this construction already provides "aligned" CG 
-        # coefficients ready to be used in the sparse accumulation package:
+        if self.algorithm == "dense":
 
-        m1_array = [] 
-        m2_array = []
-        M_array = []
-        cg_array = []
+            self._cg[(l1, l2, L)] = torch.tensor(rcg).type(torch.get_default_dtype()).to(self.device)
 
-        for M in range(2 * L + 1):
-            cg_nonzero = np.where(np.abs(rcg[:,:,M]) > 1e-15)
-            m1_array.append(cg_nonzero[0])
-            m2_array.append(cg_nonzero[1])
-            M_array.append(np.array([M]*len(cg_nonzero[0])))
-            cg_array.append(rcg[cg_nonzero[0], cg_nonzero[1], M])
+        else:
 
-        m1_array = torch.LongTensor(np.concatenate(m1_array))
-        m2_array = torch.LongTensor(np.concatenate(m2_array))
-        M_array = torch.LongTensor(np.concatenate(M_array))
-        cg_array = torch.tensor(np.concatenate(cg_array)).type(torch.get_default_dtype())
+            # Note that this construction already provides "aligned" CG 
+            # coefficients ready to be used in the sparse accumulation package:
 
-        new_cg = SparseCGTensor(m1_array, m2_array, M_array, cg_array)
-            
-        self._cg[(l1, l2, L)] = new_cg
+            m1_array = [] 
+            m2_array = []
+            M_array = []
+            cg_array = []
+
+            for M in range(2 * L + 1):
+                cg_nonzero = np.where(np.abs(rcg[:,:,M]) > 1e-15)
+                m1_array.append(cg_nonzero[0])
+                m2_array.append(cg_nonzero[1])
+                M_array.append(np.array([M]*len(cg_nonzero[0])))
+                cg_array.append(rcg[cg_nonzero[0], cg_nonzero[1], M])
+
+            m1_array = torch.LongTensor(np.concatenate(m1_array)).to(self.device)
+            m2_array = torch.LongTensor(np.concatenate(m2_array)).to(self.device)
+            M_array = torch.LongTensor(np.concatenate(M_array)).to(self.device)
+            cg_array = torch.tensor(np.concatenate(cg_array)).type(torch.get_default_dtype()).to(self.device)
+
+            new_cg = SparseCGTensor(m1_array, m2_array, M_array, cg_array)
+                
+            self._cg[(l1, l2, L)] = new_cg
 
     
     def combine(self, block_nu, block_1, L, selected_features):
 
-        device = block_1.values.device
+        device = self.device
 
         lam = (block_nu.values.shape[1] - 1) // 2
         l = (block_1.values.shape[1] - 1) // 2
@@ -86,12 +91,15 @@ class ClebschGordanReal:
         if (lam, l, L) not in self._cg:
             self._add(lam, l, L)
 
-        sparse_cg_tensor = self._cg[(lam, l, L)]
-
-        mu_array = sparse_cg_tensor.m1.to(device)
-        m_array = sparse_cg_tensor.m2.to(device)
-        M_array = sparse_cg_tensor.M.to(device)
-        cg_array = sparse_cg_tensor.cg.to(device)
+        if self.algorithm != "dense":
+            sparse_cg_tensor = self._cg[(lam, l, L)]
+            mu_array = sparse_cg_tensor.m1
+            m_array = sparse_cg_tensor.m2
+            M_array = sparse_cg_tensor.M
+            cg_array = sparse_cg_tensor.cg
+        else:  # dense algorithm
+            dense_cg_matrix = self._cg[(lam, l, L)]
+            dense_cg_matrix = dense_cg_matrix.reshape(-1, dense_cg_matrix.shape[2])
 
         if block_nu.has_gradient("positions"):
             gradients_nu = block_nu.gradient("positions")
@@ -169,6 +177,35 @@ class ClebschGordanReal:
                     )).swapaxes(1, 2).reshape((-1, 3, 2*L+1, n_selected_features))
                 else:
                     new_derivatives = None
+
+        elif self.algorithm == "dense":
+
+            new_values = (
+                (block_nu.values[:, :, selected_features[:, 0]].swapaxes(1, 2))[:, :, :, None] * 
+                (block_1.values[:, :, selected_features[:, 1]].swapaxes(1, 2))[:, :, None, :]
+            )
+            new_values = new_values.reshape((new_values.shape[0], new_values.shape[1], -1))
+            new_values = new_values @ dense_cg_matrix
+            new_values = new_values.swapaxes(1, 2)
+
+            if block_nu.has_gradient("positions"):
+
+                new_derivatives_1 = (
+                    (gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2))[:, :, :, None] *
+                    (block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2))[:, :, None, :]
+                )
+                new_derivatives_2 = (
+                    (block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2))[:, :, :, None] *
+                    (gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2))[:, :, None, :]
+                )
+                new_derivatives = new_derivatives_1 + new_derivatives_2
+                new_derivatives = new_derivatives.reshape((new_derivatives.shape[0], new_derivatives.shape[1], -1))
+                new_derivatives = new_derivatives @ dense_cg_matrix
+                new_derivatives = new_derivatives.swapaxes(1, 2).reshape((-1, 3, 2*L+1, n_selected_features))
+
+            else:
+                new_derivatives = None
+
 
         else:  # Python loop algorithm
 

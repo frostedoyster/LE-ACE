@@ -1,5 +1,3 @@
-from utils.LE_expansion import get_LE_expansion, get_calculator
-
 import math
 import numpy as np
 import torch
@@ -13,9 +11,10 @@ from utils.error_measures import get_rmse, get_mae
 from utils.cg import ClebschGordanReal
 from utils.composition import get_composition_features
 from utils.lexicographic_multiplicities import apply_multiplicities
-from utils.spherical_bessel_zeros import get_laplacian_eigenvalues
 from utils.sum_like_atoms import sum_like_atoms
 
+from utils.LE_initialization import initialize_basis
+from utils.LE_expansion import get_LE_expansion
 from utils.LE_iterations import LEIterator
 from utils.LE_invariants import LEInvariantCalculator
 from utils.LE_regularization import get_LE_regularization
@@ -36,9 +35,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     n_test = param_dict["n_test"]
     # n_train = param_dict["n_train"]
     do_gradients = param_dict["do gradients"]
-    global r_cut
     r_cut = param_dict["r_cut"]
-    global r_cut_rs
     r_cut_rs = param_dict["r_cut_rs"]
     nu_max = param_dict["nu_max"]
     E_max_coefficients = param_dict["E_max coefficients"]
@@ -112,7 +109,6 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     train_structures, test_structures = get_dataset_slices(DATASET_PATH, train_slice, test_slice)
 
     min_training_set_distance = get_minimum_distance(train_structures)
-    global factor2
     factor2 = 0.9*min_training_set_distance
 
     train_energies = torch.tensor([structure.info[TARGET_KEY] for structure in train_structures])*CONVERSION_FACTOR
@@ -125,20 +121,15 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
     print(f"All species: {all_species}")
 
-    E_nl = get_laplacian_eigenvalues(50, 50, cost_trade_off)
-    n_max_rs = np.where(E_nl[:, 0] <= E_max[1])[0][-1] + 1
-    print(f"Radial spectrum: n_max = {n_max_rs}")
-
-    n_max = np.where(E_nl[:, 0] <= E_max[2])[0][-1] + 1
-    l_max = np.where(E_nl[0, :] <= E_max[2])[0][-1]
-    print(f"Spherical expansion: n_max = {n_max}, l_max = {l_max}")
+    _, E_n0, radial_spectrum_calculator = initialize_basis(r_cut_rs, True, E_max[1], le_type, factor, rnn=0.0)
+    print(E_n0)
+    l_max, E_nl, spherical_expansion_calculator = initialize_basis(r_cut, False, E_max[2], le_type, factor, rnn=0.0)
+    print(E_nl)
 
     n_max_l = []
     for l in range(l_max+1):
         n_max_l.append(np.where(E_nl[:, l] <= E_max[2])[0][-1] + 1)
-
-    radial_spectrum_calculator = get_calculator(r_cut_rs, n_max_rs, 0, factor, le_type)
-    spherical_expansion_calculator = get_calculator(r_cut, n_max, l_max, factor, le_type)
+    print(n_max_l)
 
     # anl counter:
     a_max = len(all_species)
@@ -151,7 +142,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 anl_counter += 1
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
-    cg_object = ClebschGordanReal(algorithm="fast cg")
+    cg_object = ClebschGordanReal(device=device, algorithm="dense")
     equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object)  # L_max=3
 
     def get_LE_invariants(structures):
@@ -160,7 +151,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         comp = get_composition_features(structures, all_species)
         print("Composition features done")
 
-        rs = get_LE_expansion(structures, radial_spectrum_calculator, E_nl, E_max[1], all_species, rs=True, do_gradients=do_gradients)
+        rs = get_LE_expansion(structures, radial_spectrum_calculator, E_n0, E_max[1], all_species, rs=True, do_gradients=do_gradients)
         if nu_max > 1: spherical_expansion = get_LE_expansion(structures, spherical_expansion_calculator, E_nl, E_max[2], all_species, do_gradients=do_gradients, device=device)
 
         invariants = [rs]
@@ -228,7 +219,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         # The equistore to function here would allow for much better memory management
         X_train.append(moved_X)
 
-    properties = [X_train[0][nu-1].block().properties for nu in range(nu_max)]
+    properties = [X_train[0][nu].block().properties for nu in range(nu_max)]
 
     if dataset_style == "mixed":
         LE_reg_comp = torch.tensor([0.0]*len(all_species))
@@ -326,13 +317,19 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
         LE_reg = []
         for nu in range(nu_max+1):
-            if nu > 0:
+            if nu > 1:
                 LE_reg.append(
                     get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, beta)
+                )
+            elif nu == 1:
+                print(E_n0)
+                LE_reg.append(
+                    get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, beta)
                 )
             else:
                 LE_reg.append(LE_reg_comp)
         LE_reg = torch.concat(LE_reg)
+        print(LE_reg[0:100])
 
         for alpha in alpha_list:
             #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
@@ -369,9 +366,14 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
     LE_reg = []
     for nu in range(nu_max+1):
-        if nu > 0:
+        if nu > 1:
             LE_reg.append(
                 get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, best_beta)
+            )
+        elif nu == 1:
+            print(E_n0)
+            LE_reg.append(
+                get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, best_beta)
             )
         else:
             LE_reg.append(LE_reg_comp)

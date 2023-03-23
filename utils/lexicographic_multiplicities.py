@@ -19,7 +19,7 @@ def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
         multiplicity = math.factorial(nu)
         for count in counts:
             multiplicity = multiplicity/math.factorial(count)
-        multiplicity = np.sqrt(multiplicity)
+        # multiplicity = np.sqrt(multiplicity)
         multiplicities.append(multiplicity)
     multiplicities = torch.tensor(multiplicities, device=old_map.block(0).values.device)
     # print(multiplicities)
