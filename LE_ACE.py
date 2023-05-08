@@ -142,7 +142,8 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 anl_counter += 1
 
     invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
-    cg_object = ClebschGordanReal(device=device, algorithm="dense")
+    alg = "fast cg" if device=="cpu" else "dense"
+    cg_object = ClebschGordanReal(device=device, algorithm=alg)
     equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object)  # L_max=3
 
     def get_LE_invariants(structures):
@@ -188,6 +189,36 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     train_structures = get_batches(train_structures, BATCH_SIZE)
     test_structures = get_batches(test_structures, BATCH_SIZE)
 
+    from equistore import TensorBlock, TensorMap
+    def to_cpu(tmap):
+        if tmap.block(0).values.device == "cpu":
+            return tmap
+
+        new_blocks = []
+        for _, block in tmap:
+            new_block = TensorBlock(
+                values=block.values.to("cpu"),
+                samples=block.samples,
+                components=block.components,
+                properties=block.properties
+            )
+            if block.has_gradient("positions"):
+                old_gradients = block.gradient("positions")
+                new_block.add_gradient(
+                    parameter="positions",
+                    gradient=TensorBlock(
+                        values=old_gradients.values.to("cpu"),
+                        samples=old_gradients.samples,
+                        components=old_gradients.components,
+                        properties=old_gradients.properties
+                    )
+                )
+            new_blocks.append(new_block)
+        return TensorMap(
+            keys=tmap.keys,
+            blocks=new_blocks
+        )
+
     train_comp = []
     if do_gradients: train_dcomp = []
     X_train = []
@@ -205,9 +236,9 @@ def run_fit(parameters, n_train, RANDOM_SEED):
       
         if do_gradients:    
             if dataset_style == "mixed":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, len(all_species)))
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, len(all_species)))
             elif dataset_style == "MD":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, 1))
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, 1))
             else:
                 raise NotImplementedError("The dataset_style must be either MD or mixed")
             train_dcomp.append(dcomp)
@@ -215,11 +246,11 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         moved_X = []
         for tmap in X:
             moved_tmap = tmap.keys_to_properties(keys_to_move="a_i")
-            moved_X.append(moved_tmap)
+            moved_X.append(to_cpu(moved_tmap))
         # The equistore to function here would allow for much better memory management
         X_train.append(moved_X)
 
-    properties = [X_train[0][nu].block().properties for nu in range(nu_max)]
+    properties = [X_train[0][nu-1].block().properties for nu in range(1, nu_max+1)]
 
     if dataset_style == "mixed":
         LE_reg_comp = torch.tensor([0.0]*len(all_species))
@@ -232,18 +263,18 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     X_train_batches = []
     if do_gradients: dX_train_batches = []
     for i_batch, batch in enumerate(X_train):
-        processed_batch = [batch[nu-1].block().values.cpu() for nu in range(nu_max)]
+        processed_batch = [batch[nu-1].block().values for nu in range(1, nu_max+1)]
         processed_batch = torch.concat([train_comp[i_batch]]+processed_batch, dim=-1)
         X_train_batches.append(processed_batch)
         if do_gradients:
-            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").data.cpu().reshape(batch[nu-1].block().gradient("positions").data.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(nu_max)]
+            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").values.cpu().reshape(batch[nu-1].block().gradient("positions").values.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(1, nu_max+1)]
             d_processed_batch = torch.concat([train_dcomp[i_batch]]+d_processed_batch, dim=-1)
             dX_train_batches.append(d_processed_batch)
 
     if do_gradients:
         X_train = torch.concat(X_train_batches + dX_train_batches, dim = 0)
     else:
-        X_train = torch.concat(X_test_batches, dim = 0)
+        X_train = torch.concat(X_train_batches, dim = 0)
 
     test_comp = []
     if do_gradients: test_dcomp = []
@@ -262,9 +293,9 @@ def run_fit(parameters, n_train, RANDOM_SEED):
       
         if do_gradients:    
             if dataset_style == "mixed":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, len(all_species)))
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, len(all_species)))
             elif dataset_style == "MD":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").data.shape[0]*3, 1))
+                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, 1))
             else:
                 raise NotImplementedError("The dataset_style must be either MD or mixed")
             test_dcomp.append(dcomp)
@@ -272,17 +303,17 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         moved_X = []
         for tmap in X:
             moved_tmap = tmap.keys_to_properties(keys_to_move="a_i")
-            moved_X.append(moved_tmap)
+            moved_X.append(to_cpu(moved_tmap))
         X_test.append(moved_X)
 
     X_test_batches = []
     if do_gradients: dX_test_batches = []
     for i_batch, batch in enumerate(X_test):
-        processed_batch = [batch[nu-1].block().values.cpu() for nu in range(nu_max)]
+        processed_batch = [batch[nu-1].block().values for nu in range(1, nu_max+1)]
         processed_batch = torch.concat([test_comp[i_batch]]+processed_batch, dim=-1)
         X_test_batches.append(processed_batch)
         if do_gradients:
-            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").data.cpu().reshape(batch[nu-1].block().gradient("positions").data.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(nu_max)]
+            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").values.cpu().reshape(batch[nu-1].block().gradient("positions").values.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(1, nu_max+1)]
             d_processed_batch = torch.concat([test_dcomp[i_batch]]+d_processed_batch, dim=-1)
             dX_test_batches.append(d_processed_batch)
 
@@ -305,13 +336,14 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
-    alpha_list = np.linspace(-15.0, -5.0, 21)
+    alpha_list = np.linspace(-12.5, -2.5, 21)
     # alpha_list = np.linspace(-5.0, 5.0, 41)
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
 
     best_opt_target = 1e30
-    for beta in [-2.0, -1.0, 0, 1.0, 2.0]:
+    #for beta in [-2.0, -1.0, 0, 1.0, 2.0]:  # reproduce
+    for beta in [0.0]:
 
         print("beta=", beta)
 
@@ -322,14 +354,12 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                     get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, beta)
                 )
             elif nu == 1:
-                print(E_n0)
                 LE_reg.append(
                     get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, beta)
                 )
             else:
                 LE_reg.append(LE_reg_comp)
         LE_reg = torch.concat(LE_reg)
-        print(LE_reg[0:100])
 
         for alpha in alpha_list:
             #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)

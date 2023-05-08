@@ -159,16 +159,19 @@ class LEIterator(torch.nn.Module):
                     ),
                 )
                 if do_gradients: block.add_gradient(
-                    "positions",
-                    data = gradient_data[L], 
-                    samples = block_1.gradient("positions").samples, 
-                    components = [ 
-                        block_1.gradient("positions").components[0],
-                        Labels(
-                            names=("mu",),
-                            values=np.asarray(range(-L, L+1), dtype=np.int32).reshape(2*L+1, 1),
-                        ), 
-                    ],
+                    parameter="positions",
+                    gradient=TensorBlock(
+                        values = gradient_data[L], 
+                        samples = block_1.gradient("positions").samples, 
+                        components = [ 
+                            block_1.gradient("positions").components[0],
+                            Labels(
+                                names=("mu",),
+                                values=np.asarray(range(-L, L+1), dtype=np.int32).reshape(2*L+1, 1),
+                            ), 
+                        ],
+                        properties = block.properties
+                    )
                 )
                 blocks.append(block)
                 keys.append([a_i, L])

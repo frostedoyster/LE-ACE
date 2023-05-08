@@ -173,7 +173,7 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
                 names=["species_neighbor"],
                 values=np.array(all_species, dtype=np.int32).reshape(-1, 1),
             )
-        spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
+        spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
 
         import matplotlib.pyplot as plt
         plt.plot(r, block_C_0_0/spherical_harmonics_0, label="rascaline output")

@@ -19,10 +19,9 @@ def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
         multiplicity = math.factorial(nu)
         for count in counts:
             multiplicity = multiplicity/math.factorial(count)
-        # multiplicity = np.sqrt(multiplicity)
+        multiplicity = np.sqrt(multiplicity)  # reproduce
         multiplicities.append(multiplicity)
     multiplicities = torch.tensor(multiplicities, device=old_map.block(0).values.device)
-    # print(multiplicities)
 
     new_blocks = []
     for _, block in old_map:
@@ -33,13 +32,17 @@ def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
             properties=block.properties,
         )
         if block.has_gradient("positions"): new_block.add_gradient(
-            "positions",
-            data = block.gradient("positions").data*multiplicities, 
-            samples = block.gradient("positions").samples, 
-            components = block.gradient("positions").components,
+            parameter="positions",
+            gradient=TensorBlock(
+                values = block.gradient("positions").values*multiplicities, 
+                samples = block.gradient("positions").samples, 
+                components = block.gradient("positions").components,
+                properties = block.gradient("positions").properties
+            )
         )
         new_blocks.append(new_block)
+
     return TensorMap(
             keys = old_map.keys,
             blocks = new_blocks
-            )
+        )

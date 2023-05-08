@@ -19,14 +19,14 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
         for n in block.properties["n"]:
             if E_nl[n, l] <= E_max: counter += 1
         LE_values = torch.zeros((block.values.shape[0], block.values.shape[1], counter))
-        if do_gradients: LE_gradients = torch.zeros((block.gradient("positions").data.shape[0], block.gradient("positions").data.shape[1], block.values.shape[1], counter))
+        if do_gradients: LE_gradients = torch.zeros((block.gradient("positions").values.shape[0], block.gradient("positions").values.shape[1], block.values.shape[1], counter))
         counter_LE = 0
         counter_total = 0
         labels_LE = [] 
         for n in block.properties["n"]:
             if E_nl[n, l] <= E_max: 
                 LE_values[:, :, counter_LE] = torch.tensor(block.values[:, :, counter_total])
-                if do_gradients: LE_gradients[:, :, :, counter_LE] = torch.tensor(block.gradient("positions").data[:, :, :, counter_total])
+                if do_gradients: LE_gradients[:, :, :, counter_LE] = torch.tensor(block.gradient("positions").values[:, :, :, counter_total])
                 labels_LE.append([species_remapping[block.properties["species_neighbor"][counter_total]], n, l, l])
                 counter_LE += 1
             counter_total += 1
@@ -40,10 +40,13 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
             ),
         )
         if do_gradients: LE_block.add_gradient(
-            "positions",
-            data = LE_gradients.to(device), 
-            samples = block.gradient("positions").samples, 
-            components = block.gradient("positions").components,
+            parameter="positions",
+            gradient=TensorBlock(
+                values = LE_gradients.to(device), 
+                samples = block.gradient("positions").samples, 
+                components = block.gradient("positions").components,
+                properties=LE_block.properties
+            )
         )
         LE_blocks.append(LE_block)
     return TensorMap(
@@ -72,14 +75,14 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMa
         for n in block.properties["n"]:
             if E_n[n] <= E_max: counter += 1
         LE_values = torch.zeros((block.values.shape[0], counter))
-        if do_gradients: LE_gradients = torch.zeros((block.gradient("positions").data.shape[0], block.gradient("positions").data.shape[1], counter))
+        if do_gradients: LE_gradients = torch.zeros((block.gradient("positions").values.shape[0], block.gradient("positions").values.shape[1], counter))
         counter_LE = 0
         counter_total = 0
         labels_LE = [] 
         for n in block.properties["n"]:
             if E_n[n] <= E_max: 
                 LE_values[:, counter_LE] = torch.tensor(block.values[:, counter_total])
-                if do_gradients: LE_gradients[:, :, counter_LE] = torch.tensor(block.gradient("positions").data[:, :, counter_total])
+                if do_gradients: LE_gradients[:, :, counter_LE] = torch.tensor(block.gradient("positions").values[:, :, counter_total])
                 labels_LE.append([species_remapping[block.properties["species_neighbor"][counter_total]], n, l, l])
                 counter_LE += 1
             counter_total += 1
@@ -93,10 +96,13 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMa
             ),
         )
         if do_gradients: LE_block.add_gradient(
-            "positions",
-            data = LE_gradients, 
-            samples = block.gradient("positions").samples, 
-            components = block.gradient("positions").components,
+            parameter="positions",
+            gradient=TensorBlock(
+                values = LE_gradients, 
+                samples = block.gradient("positions").samples, 
+                components = block.gradient("positions").components,
+                properties = LE_block.properties,
+            )
         )
         LE_blocks.append(LE_block)
 

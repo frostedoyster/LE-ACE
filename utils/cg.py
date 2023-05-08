@@ -80,7 +80,7 @@ class ClebschGordanReal:
                 
             self._cg[(l1, l2, L)] = new_cg
 
-    
+
     def combine(self, block_nu, block_1, L, selected_features):
 
         device = self.device
@@ -124,23 +124,25 @@ class ClebschGordanReal:
 
                 if block_nu.has_gradient("positions"):
 
-                    new_derivatives = (sparse_accumulation.accumulate_active_dim_middle(
-                        gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
-                        block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
-                        M_array, 
-                        2*L+1, 
-                        mu_array, 
-                        m_array, 
-                        cg_array
-                    ) + sparse_accumulation.accumulate_active_dim_middle(
-                        block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
-                        gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
-                        M_array, 
-                        2*L+1, 
-                        mu_array, 
-                        m_array, 
-                        cg_array
-                    )).reshape((-1, 3, 2*L+1, n_selected_features))
+                    new_derivatives = (
+                        sparse_accumulation.accumulate_active_dim_middle(
+                            gradients_nu.values[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
+                            block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
+                            M_array, 
+                            2*L+1, 
+                            mu_array, 
+                            m_array, 
+                            cg_array
+                        ) + sparse_accumulation.accumulate_active_dim_middle(
+                            block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).contiguous(),
+                            gradients_1.values[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).contiguous(),
+                            M_array, 
+                            2*L+1, 
+                            mu_array, 
+                            m_array, 
+                            cg_array
+                        )
+                    ).reshape((-1, 3, 2*L+1, n_selected_features))
                 else:
                     new_derivatives = None
 
@@ -158,23 +160,25 @@ class ClebschGordanReal:
 
                 if block_nu.has_gradient("positions"):
 
-                    new_derivatives = (sparse_accumulation.accumulate(
-                        gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
-                        block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
-                        M_array, 
-                        2*L+1, 
-                        mu_array, 
-                        m_array, 
-                        cg_array
-                    ) + sparse_accumulation.accumulate(
-                        block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
-                        gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
-                        M_array, 
-                        2*L+1, 
-                        mu_array, 
-                        m_array, 
-                        cg_array
-                    )).swapaxes(1, 2).reshape((-1, 3, 2*L+1, n_selected_features))
+                    new_derivatives = (
+                        sparse_accumulation.accumulate(
+                            gradients_nu.values[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                            block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                            M_array, 
+                            2*L+1, 
+                            mu_array, 
+                            m_array, 
+                            cg_array
+                        ) + sparse_accumulation.accumulate(
+                            block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                            gradients_1.values[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2).contiguous(),
+                            M_array, 
+                            2*L+1, 
+                            mu_array, 
+                            m_array, 
+                            cg_array
+                        )
+                    ).swapaxes(1, 2).reshape((-1, 3, 2*L+1, n_selected_features))
                 else:
                     new_derivatives = None
 
@@ -191,12 +195,12 @@ class ClebschGordanReal:
             if block_nu.has_gradient("positions"):
 
                 new_derivatives_1 = (
-                    (gradients_nu.data[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2))[:, :, :, None] *
+                    (gradients_nu.values[:, :, :, selected_features[:, 0]].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2))[:, :, :, None] *
                     (block_1.values[samples_for_gradients_nu][:, :, selected_features[:, 1]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2))[:, :, None, :]
                 )
                 new_derivatives_2 = (
                     (block_nu.values[samples_for_gradients_1][:, :, selected_features[:, 0]].unsqueeze(dim=1)[:, [0, 0, 0], :, :].reshape((-1, 2*lam+1, n_selected_features)).swapaxes(1, 2))[:, :, :, None] *
-                    (gradients_1.data[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2))[:, :, None, :]
+                    (gradients_1.values[:, :, :, selected_features[:, 1]].reshape((-1, 2*l+1, n_selected_features)).swapaxes(1, 2))[:, :, None, :]
                 )
                 new_derivatives = new_derivatives_1 + new_derivatives_2
                 new_derivatives = new_derivatives.reshape((new_derivatives.shape[0], new_derivatives.shape[1], -1))
@@ -211,14 +215,14 @@ class ClebschGordanReal:
 
             new_values = torch.zeros((block_nu.values.shape[0], 2*L+1, selected_features.shape[0]), device=device)
             if block_nu.has_gradient("positions"): 
-                new_derivatives = torch.zeros((gradients_nu.data.shape[0], 3, 2*L+1, selected_features.shape[0]), device=device)
+                new_derivatives = torch.zeros((gradients_nu.values.shape[0], 3, 2*L+1, selected_features.shape[0]), device=device)
             else:
                 new_derivatives = None
 
             for mu, m, M, cg_coefficient in zip(sparse_cg_tensor.m1, sparse_cg_tensor.m2, sparse_cg_tensor.M, sparse_cg_tensor.cg):
                 new_values[:, M, :] += cg_coefficient * block_nu.values[:, mu, selected_features[:, 0]] * block_1.values[:, m, selected_features[:, 1]]
                 if block_nu.has_gradient("positions"): 
-                    new_derivatives[:, :, M, :] += cg_coefficient * (gradients_nu.data[:, :, mu, selected_features[:, 0]] * block_1.values[samples_for_gradients_nu][:, m, selected_features[:, 1]].unsqueeze(dim=1) + block_nu.values[samples_for_gradients_1][:, mu, selected_features[:, 0]].unsqueeze(dim=1) * gradients_1.data[:, :, m, selected_features[:, 1]])  # exploiting broadcasting rules
+                    new_derivatives[:, :, M, :] += cg_coefficient * (gradients_nu.values[:, :, mu, selected_features[:, 0]] * block_1.values[samples_for_gradients_nu][:, m, selected_features[:, 1]].unsqueeze(dim=1) + block_nu.values[samples_for_gradients_1][:, mu, selected_features[:, 0]].unsqueeze(dim=1) * gradients_1.values[:, :, m, selected_features[:, 1]])  # exploiting broadcasting rules
 
         return new_values, new_derivatives
 

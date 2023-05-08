@@ -125,7 +125,7 @@ class LEInvariantCalculator(torch.nn.Module):
                     samples_for_gradients_1 = torch.tensor(gradients_1.samples["sample"], dtype=torch.int64)
 
                 data[:, nu_plus_one_count:nu_plus_one_count+selected_features[l].shape[0]] = cg*torch.sum(block_nu.values[:, :, selected_features[l][:, 0]]*block_1.values[:, :, selected_features[l][:, 1]], dim = 1, keepdim = False)
-                if do_gradients: gradient_data[:, :, nu_plus_one_count:nu_plus_one_count+selected_features[l].shape[0]] = cg * torch.sum(gradients_nu.data[:, :, :, selected_features[l][:, 0]] * block_1.values[samples_for_gradients_nu][:, :, selected_features[l][:, 1]].unsqueeze(dim=1) + block_nu.values[samples_for_gradients_1][:, :, selected_features[l][:, 0]].unsqueeze(dim=1) * gradients_1.data[:, :, :, selected_features[l][:, 1]], dim = 2, keepdim = False)  # exploiting broadcasting rules
+                if do_gradients: gradient_data[:, :, nu_plus_one_count:nu_plus_one_count+selected_features[l].shape[0]] = cg * torch.sum(gradients_nu.values[:, :, :, selected_features[l][:, 0]] * block_1.values[samples_for_gradients_nu][:, :, selected_features[l][:, 1]].unsqueeze(dim=1) + block_nu.values[samples_for_gradients_1][:, :, selected_features[l][:, 0]].unsqueeze(dim=1) * gradients_1.values[:, :, :, selected_features[l][:, 1]], dim = 2, keepdim = False)  # exploiting broadcasting rules
                 
                 nu_plus_one_count += selected_features[l].shape[0]
 
@@ -139,10 +139,13 @@ class LEInvariantCalculator(torch.nn.Module):
                 ),
             )
             if do_gradients: block.add_gradient(
-                "positions",
-                data = gradient_data, 
-                samples = gradients_1.samples, 
-                components = [gradients_1.components[0]],
+                parameter="positions",
+                gradient=TensorBlock(
+                    values = gradient_data, 
+                    samples = gradients_1.samples, 
+                    components = [gradients_1.components[0]],
+                    properties = block.properties
+                )
             )
             keys.append([a_i])
             blocks.append(block)
