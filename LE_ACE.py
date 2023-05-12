@@ -37,6 +37,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     n_test = param_dict["n_test"]
     # n_train = param_dict["n_train"]
     do_gradients = param_dict["do gradients"]
+    FORCE_WEIGHT = param_dict["force weight"]
     r_cut = param_dict["r_cut"]
     r_cut_rs = param_dict["r_cut_rs"]
     nu_max = param_dict["nu_max"]
@@ -66,7 +67,6 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     FORCE_CONVERSION_FACTOR = conversions[FORCE_CONVERSION]
 
     print("Dataset path: " + DATASET_PATH)
-    FORCE_WEIGHT = 1.0/30.0
 
     if "methane" in DATASET_PATH or "ch4" in DATASET_PATH or "rmd17" in DATASET_PATH or "gold" in DATASET_PATH:
         n_elems = len(np.unique(ase.io.read(DATASET_PATH, index = "0:1")[0].get_atomic_numbers()))
