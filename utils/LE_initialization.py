@@ -15,13 +15,13 @@ from .physical_LE import initialize_physical_LE
 from .LE_cutoff import get_LE_cutoff
 
 
-def initialize_basis(a, rs, E_max, le_type, r0, rnn=0.0):
+def initialize_basis(a, rs, E_max, le_type, r0, rnn, cost_trade_off=False):
 
     # Will return eigenvalues and a calculator
     if le_type == "pure" or le_type == "paper" or le_type == "transform":
-        n_max, l_max, E_nl, splines = initialize_LE(a, rs, E_max, r0, rnn, le_type)
+        n_max, l_max, E_nl, splines = initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off)
     elif le_type == "physical":
-        n_max, l_max, E_nl, splines = initialize_physical_LE(a, rs, E_max, r0, rnn)
+        n_max, l_max, E_nl, splines = initialize_physical_LE(a, rs, E_max, r0, rnn, cost_trade_off)
     else:
         raise NotImplementedError("LE type can only be pure, paper, transform, and physical")
 
@@ -30,12 +30,12 @@ def initialize_basis(a, rs, E_max, le_type, r0, rnn=0.0):
     return l_max, E_nl, calculator
 
 
-def initialize_LE(a, rs, E_max, r0, rnn, le_type):
+def initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off=False):
 
     l_big = 0 if rs else 50
     n_big = 50
 
-    E_nl = get_laplacian_eigenvalues(n_big, l_big, cost_trade_off=False)
+    E_nl = get_laplacian_eigenvalues(n_big, l_big, cost_trade_off=cost_trade_off)
     if rs:
         E_nl = E_nl[:, 0]
     n_max, l_max = get_LE_cutoff(E_nl, E_max, rs)
@@ -79,7 +79,10 @@ def initialize_LE(a, rs, E_max, r0, rnn, le_type):
         elif le_type == "paper":
             x = a*(1.0-np.exp(-r0*np.tan(np.pi*r/(2*a))))
         elif le_type == "transform":
-            x = a*(1.0-np.exp(-r/r0))#*(1.0-np.exp(-(r/factor2)**2))
+            if rnn == 0.0:
+                x = a*(1.0-np.exp(-r/r0))
+            else:
+                x = a*(1.0-np.exp(-r/r0))*(1.0-np.exp(-(r/rnn)**2))
         else:
             raise NotImplementedError("LE type here can only be pure, paper, and transform")
         return x

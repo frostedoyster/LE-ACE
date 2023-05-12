@@ -26,7 +26,7 @@ def get_laplacian_eigenvalues(n_big, l_big, cost_trade_off):
     E_nl = z_nl**2
 
     if cost_trade_off:
-        raise NotImplementedError("More thought needs to go into these modified eigenvalues")
+        # raise NotImplementedError("More thought needs to go into these modified eigenvalues")
         for l in range(l_big+1):
            E_nl[:, l] *= 2*l+1
 

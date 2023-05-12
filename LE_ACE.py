@@ -25,6 +25,8 @@ torch.set_default_dtype(torch.float64)
 
 def run_fit(parameters, n_train, RANDOM_SEED):
 
+    print("10, 1.0, inner")
+
     param_dict = json.load(open(parameters, "r"))
     # RANDOM_SEED = param_dict["random seed"]
     BATCH_SIZE = param_dict["batch size"]
@@ -44,6 +46,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     cost_trade_off = param_dict["cost_trade_off"]
     le_type = param_dict["le_type"]
     dataset_style = param_dict["dataset_style"]
+    inner_smoothing = param_dict["inner_smoothing"]
 
     np.random.seed(RANDOM_SEED)
     print(f"Random seed: {RANDOM_SEED}")
@@ -109,7 +112,10 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     train_structures, test_structures = get_dataset_slices(DATASET_PATH, train_slice, test_slice)
 
     min_training_set_distance = get_minimum_distance(train_structures)
-    factor2 = 0.9*min_training_set_distance
+    if inner_smoothing:
+        factor2 = 0.9*min_training_set_distance
+    else:
+        factor2 = 0.0
 
     train_energies = torch.tensor([structure.info[TARGET_KEY] for structure in train_structures])*CONVERSION_FACTOR
     test_energies = torch.tensor([structure.info[TARGET_KEY] for structure in test_structures])*CONVERSION_FACTOR
@@ -121,9 +127,9 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
     print(f"All species: {all_species}")
 
-    _, E_n0, radial_spectrum_calculator = initialize_basis(r_cut_rs, True, E_max[1], le_type, factor, rnn=0.0)
+    _, E_n0, radial_spectrum_calculator = initialize_basis(r_cut_rs, True, E_max[1], le_type, factor, factor2)
     print(E_n0)
-    l_max, E_nl, spherical_expansion_calculator = initialize_basis(r_cut, False, E_max[2], le_type, factor, rnn=0.0)
+    l_max, E_nl, spherical_expansion_calculator = initialize_basis(r_cut, False, E_max[2], le_type, factor, factor2, cost_trade_off=cost_trade_off)
     print(E_nl)
 
     n_max_l = []
@@ -336,14 +342,13 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
-    alpha_list = np.linspace(-12.5, -2.5, 21)
+    alpha_list = np.linspace(-15.0, -5.0, 21)
     # alpha_list = np.linspace(-5.0, 5.0, 41)
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
 
     best_opt_target = 1e30
-    #for beta in [-2.0, -1.0, 0, 1.0, 2.0]:  # reproduce
-    for beta in [0.0]:
+    for beta in [-2.0, -1.0, 0.0, 1.0, 2.0, 3.0]:  # reproduce
 
         print("beta=", beta)
 
@@ -419,9 +424,6 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     test_predictions = X_test @ c
     print("n_train:", n_train, "n_features:", n_feat)
     print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT}]")
-
-    with open(f"outputs/gold/{n_train}-{RANDOM_SEED}.out", "w") as out:
-        out.write(str(get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()) + "\n")
 
     # Uncomment for speed evaluation
     """
