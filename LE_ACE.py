@@ -25,7 +25,7 @@ torch.set_default_dtype(torch.float64)
 
 def run_fit(parameters, n_train, RANDOM_SEED):
 
-    print("10, 1.0, inner")
+    print("5, 1.3, inner")
 
     param_dict = json.load(open(parameters, "r"))
     # RANDOM_SEED = param_dict["random seed"]
@@ -385,9 +385,15 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
             print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
             if opt_target_name == "mae":
-                opt_target = get_mae(test_predictions[:n_test], test_targets[:n_test]).item()
+                if do_gradients:
+                    opt_target = get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
+                else:
+                    opt_target = get_mae(test_predictions[:n_test], test_targets[:n_test]).item()
             else:
-                opt_target = get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()
+                if do_gradients:
+                    opt_target = get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
+                else:    
+                    opt_target = get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()
 
             if opt_target < best_opt_target:
                 best_opt_target = opt_target
