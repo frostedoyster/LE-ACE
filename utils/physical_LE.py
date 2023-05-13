@@ -28,7 +28,7 @@ def N_nl(n, l, z_nl):
     # Normalization factor for LE basis functions
     def function_to_integrate_to_get_normalization_factor(x):
         return j_l(l, x)**2 * x**2
-    integral, _ = sp.integrate.quadrature(function_to_integrate_to_get_normalization_factor, 0.0, z_nl[n, l], maxiter=100)
+    integral, _ = sp.integrate.quadrature(function_to_integrate_to_get_normalization_factor, 0.0, z_nl[n, l], maxiter=500)
     return ((1.0/z_nl[n, l])**3 * integral)**(-0.5)
 
 def get_LE_function(n, l, r, z_nl, precomputed_N_nl):
