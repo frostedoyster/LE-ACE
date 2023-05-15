@@ -48,7 +48,6 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     le_type = param_dict["le_type"]
     dataset_style = param_dict["dataset_style"]
     inner_smoothing = param_dict["inner_smoothing"]
-    fast_fit = param_dict["fast fit"]
 
     np.random.seed(RANDOM_SEED)
     print(f"Random seed: {RANDOM_SEED}")
@@ -251,6 +250,10 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         # The equistore to function here would allow for much better memory management
         X_train.append(moved_X)
 
+        if i_batch == 0:
+            for nu_ in range(nu_max):
+                print(f"nu={1+nu_}: {X_train[0][nu_].block().values.shape[1]}")
+
     properties = [X_train[0][nu-1].block().properties for nu in range(1, nu_max+1)]
 
     if dataset_style == "mixed":
@@ -327,39 +330,54 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
     print("Beginning hyperparameter optimization")
 
-    if fast_fit:
+    if do_gradients:
+        train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
+        test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
+    else:
+        train_targets = train_energies
+        #train_targets = torch.concat([train_energies, torch.tensor([0.0])])
+        test_targets = test_energies
 
-        train_mean = torch.mean(train_energies)
-        train_energies -= train_mean
-        test_energies -= train_mean
+    symm = X_train.T @ X_train
+    vec = X_train.T @ train_targets
+    alpha_list = np.linspace(-15.0, -5.0, 21)
+    # alpha_list = np.linspace(-5.0, 5.0, 41)
+    n_feat = X_train.shape[1]
+    print("Number of features: ", n_feat)
 
-        if do_gradients:
-            train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
-            test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
-        else:
-            train_targets = train_energies
-            #train_targets = torch.concat([train_energies, torch.tensor([0.0])])
-            test_targets = test_energies
+    best_opt_target = 1e30
+    for beta in [-2.0, -1.0, 0.0, 1.0, 2.0, 3.0]:  # reproduce
 
-        symm = X_train.T @ X_train
-        vec = X_train.T @ train_targets
-        alpha_list = np.linspace(-10.0, 0.0, 21)
-        n_feat = X_train.shape[1]
-        print("Number of features: ", n_feat)
+        print("beta=", beta)
 
-        print("Diagonalizing...")
-        d, O = torch.linalg.eigh(symm)
-        print("Diagonalization done")
-        vec2 = O.T @ vec
+        LE_reg = []
+        for nu in range(nu_max+1):
+            if nu > 1:
+                LE_reg.append(
+                    get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, beta)
+                )
+            elif nu == 1:
+                LE_reg.append(
+                    get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, beta)
+                )
+            else:
+                LE_reg.append(LE_reg_comp)
+        LE_reg = torch.concat(LE_reg)
 
-        best_opt_target = 1e30
         for alpha in alpha_list:
-            reg = 10**alpha*torch.ones((n_feat))
+            #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
+            for i in range(n_feat):
+                symm[i, i] += 10**alpha*LE_reg[i]
 
-            d_inverted = (d+reg)**(-1)
-            vec3 = d_inverted*vec2
-            c = O @ vec3
-
+            try:
+                #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
+                c = torch.linalg.solve(symm, vec)
+            except Exception as e:
+                print(e)
+                opt_target.append(1e30)
+                for i in range(n_feat):
+                    symm[i, i] -= 10.0**alpha*LE_reg[i]
+                continue
             train_predictions = X_train @ c
             test_predictions = X_test @ c
 
@@ -378,108 +396,31 @@ def run_fit(parameters, n_train, RANDOM_SEED):
             if opt_target < best_opt_target:
                 best_opt_target = opt_target
                 best_alpha = alpha
+                best_beta = beta
 
-        print("Best parameter:", best_alpha)
+            for i in range(n_feat):
+                symm[i, i] -= 10.0**alpha*LE_reg[i]
 
-        for i in range(n_feat):
-            symm[i, i] += 10**best_alpha
-        c = torch.linalg.solve(symm, vec)
+    print("Best parameters:", best_alpha, best_beta)
 
-    else:  # no fast fit
-
-        if do_gradients:
-            train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
-            test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
+    LE_reg = []
+    for nu in range(nu_max+1):
+        if nu > 1:
+            LE_reg.append(
+                get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, best_beta)
+            )
+        elif nu == 1:
+            print(E_n0)
+            LE_reg.append(
+                get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, best_beta)
+            )
         else:
-            train_targets = train_energies
-            #train_targets = torch.concat([train_energies, torch.tensor([0.0])])
-            test_targets = test_energies
+            LE_reg.append(LE_reg_comp)
+    LE_reg = torch.concat(LE_reg)
 
-        symm = X_train.T @ X_train
-        vec = X_train.T @ train_targets
-        alpha_list = np.linspace(-15.0, -5.0, 21)
-        # alpha_list = np.linspace(-5.0, 5.0, 41)
-        n_feat = X_train.shape[1]
-        print("Number of features: ", n_feat)
-
-        best_opt_target = 1e30
-        for beta in [-2.0, -1.0, 0.0, 1.0, 2.0, 3.0]:  # reproduce
-
-            print("beta=", beta)
-
-            LE_reg = []
-            for nu in range(nu_max+1):
-                if nu > 1:
-                    LE_reg.append(
-                        get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, beta)
-                    )
-                elif nu == 1:
-                    LE_reg.append(
-                        get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, beta)
-                    )
-                else:
-                    LE_reg.append(LE_reg_comp)
-            LE_reg = torch.concat(LE_reg)
-
-            for alpha in alpha_list:
-                #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
-                for i in range(n_feat):
-                    symm[i, i] += 10**alpha*LE_reg[i]
-
-                try:
-                    #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
-                    c = torch.linalg.solve(symm, vec)
-                except Exception as e:
-                    print(e)
-                    opt_target.append(1e30)
-                    for i in range(n_feat):
-                        symm[i, i] -= 10.0**alpha*LE_reg[i]
-                    continue
-                train_predictions = X_train @ c
-                test_predictions = X_test @ c
-
-                print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
-                if opt_target_name == "mae":
-                    if do_gradients:
-                        opt_target = get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
-                    else:
-                        opt_target = get_mae(test_predictions[:n_test], test_targets[:n_test]).item()
-                else:
-                    if do_gradients:
-                        opt_target = get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
-                    else:    
-                        opt_target = get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()
-
-                if opt_target < best_opt_target:
-                    best_opt_target = opt_target
-                    best_alpha = alpha
-                    best_beta = beta
-
-                for i in range(n_feat):
-                    symm[i, i] -= 10.0**alpha*LE_reg[i]
-
-        print("Best parameters:", best_alpha, best_beta)
-
-        LE_reg = []
-        for nu in range(nu_max+1):
-            if nu > 1:
-                LE_reg.append(
-                    get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, best_beta)
-                )
-            elif nu == 1:
-                print(E_n0)
-                LE_reg.append(
-                    get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, best_beta)
-                )
-            else:
-                LE_reg.append(LE_reg_comp)
-        LE_reg = torch.concat(LE_reg)
-
-        for i in range(n_feat):
-            symm[i, i] += 10**best_alpha*LE_reg[i]
-        c = torch.linalg.solve(symm, vec)
-
-    
+    for i in range(n_feat):
+        symm[i, i] += 10**best_alpha*LE_reg[i]
+    c = torch.linalg.solve(symm, vec)
 
     test_predictions = X_test @ c
     print("n_train:", n_train, "n_features:", n_feat)
