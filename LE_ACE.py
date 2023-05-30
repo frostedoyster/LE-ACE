@@ -19,6 +19,10 @@ from utils.LE_iterations import LEIterator
 from utils.LE_invariants import LEInvariantCalculator
 from utils.LE_regularization import get_LE_regularization
 
+from utils.trace.TRACE_expansion import get_TRACE_expansion
+from utils.trace.TRACE_invariants import TRACEInvariantCalculator
+from utils.trace.TRACE_iterations import TRACEIterator
+
 import json
 
 torch.set_default_dtype(torch.float64)
@@ -48,6 +52,8 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     le_type = param_dict["le_type"]
     dataset_style = param_dict["dataset_style"]
     inner_smoothing = param_dict["inner_smoothing"]
+    is_trace = param_dict["is_trace"]
+    n_trace = param_dict["n_trace"]
 
     np.random.seed(RANDOM_SEED)
     print(f"Random seed: {RANDOM_SEED}")
@@ -67,6 +73,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     FORCE_CONVERSION_FACTOR = conversions[FORCE_CONVERSION]
 
     print("Dataset path: " + DATASET_PATH)
+    print("Factor:", factor)
 
     if "methane" in DATASET_PATH or "ch4" in DATASET_PATH or "rmd17" in DATASET_PATH or "gold" in DATASET_PATH:
         n_elems = len(np.unique(ase.io.read(DATASET_PATH, index = "0:1")[0].get_atomic_numbers()))
@@ -119,6 +126,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
 
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
+    n_elems = len(all_species)
     print(f"All species: {all_species}")
 
     _, E_n0, radial_spectrum_calculator = initialize_basis(r_cut_rs, True, E_max[1], le_type, factor, factor2)
@@ -132,19 +140,28 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     print(n_max_l)
 
     # anl counter:
-    a_max = len(all_species)
+    if is_trace:
+        a_max = 1  # Pseudo-element channels don't couple to one another
+    else:
+        a_max = n_elems
     combined_anl = {}
     anl_counter = 0
     for a in range(a_max):
         for l in range(l_max+1):
             for n in range(n_max_l[l]):
-                combined_anl[(a, n, l,)] = anl_counter
+                if is_trace:
+                    combined_anl[(n, l)] = anl_counter
+                else:
+                    combined_anl[(a, n, l,)] = anl_counter
                 anl_counter += 1
 
-    invariant_calculator = LEInvariantCalculator(E_nl, combined_anl, all_species)
+    invariant_calculator = TRACEInvariantCalculator(E_nl, combined_anl, all_species) if is_trace else LEInvariantCalculator(E_nl, combined_anl, all_species)
     alg = "fast cg" if device=="cpu" else "dense"
     cg_object = ClebschGordanReal(device=device, algorithm=alg)
-    equivariant_calculator = LEIterator(E_nl, combined_anl, all_species, cg_object)  # L_max=3
+    equivariant_calculator = TRACEIterator(E_nl, combined_anl, all_species, cg_object) if is_trace else LEIterator(E_nl, combined_anl, all_species, cg_object)  # L_max=3
+
+    if is_trace:
+        trace_comb = torch.tensor(np.random.normal(size=(n_elems, n_trace)))
 
     def get_LE_invariants(structures):
 
@@ -152,8 +169,12 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         comp = get_composition_features(structures, all_species)
         print("Composition features done")
 
-        rs = get_LE_expansion(structures, radial_spectrum_calculator, E_n0, E_max[1], all_species, rs=True, do_gradients=do_gradients)
-        if nu_max > 1: spherical_expansion = get_LE_expansion(structures, spherical_expansion_calculator, E_nl, E_max[2], all_species, do_gradients=do_gradients, device=device)
+        if is_trace:
+            rs = get_TRACE_expansion(structures, radial_spectrum_calculator, E_n0, E_max[1], all_species, trace_comb, rs=True, do_gradients=do_gradients)
+            spherical_expansion = get_TRACE_expansion(structures, spherical_expansion_calculator, E_nl, E_max[2], all_species, trace_comb, do_gradients=do_gradients, device=device)
+        else:
+            rs = get_LE_expansion(structures, radial_spectrum_calculator, E_n0, E_max[1], all_species, rs=True, do_gradients=do_gradients)
+            spherical_expansion = get_LE_expansion(structures, spherical_expansion_calculator, E_nl, E_max[2], all_species, do_gradients=do_gradients, device=device)
 
         invariants = [rs]
 
@@ -340,13 +361,19 @@ def run_fit(parameters, n_train, RANDOM_SEED):
 
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
-    alpha_list = np.linspace(-15.0, -5.0, 21)
-    # alpha_list = np.linspace(-5.0, 5.0, 41)
+    alpha_list = np.linspace(-12.5, -2.5, 21)
+    if "qm9" in DATASET_PATH:
+        alpha_list = np.linspace(-15.0, 5.0, 21)
+
+    # alpha_list = np.linspace(-10.0, 10.0, 41)
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
 
+    # from torch_mkl64 import mkl64
+    # from scipy.sparse.linalg import cg
+
     best_opt_target = 1e30
-    for beta in [-2.0, -1.0, 0.0, 1.0, 2.0, 3.0]:  # reproduce
+    for beta in ([-1.0, 0.0, 1.0, 2.0, 3.0, 4.0] if "qm9" in DATASET_PATH else [-2.0, -1.0, 0.0, 1.0, 2.0]):  # reproduce
 
         print("beta=", beta)
 
@@ -370,16 +397,26 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 symm[i, i] += 10**alpha*LE_reg[i]
 
             try:
-                #c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
+                # c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
                 c = torch.linalg.solve(symm, vec)
+                # c, info = cg(symm.numpy(force=True), vec.numpy(force=True), atol=1e-10, tol=1e-12)
+                # c = torch.tensor(c)
+                """if info != 0:
+                    print(info)
+                    opt_target.append(1e30)
+                    for i in range(n_feat):
+                        symm[i, i] -= 10.0**alpha*LE_reg[i]
+                    continue"""
+                # c = mkl64.dposv(symm, vec)
             except Exception as e:
                 print(e)
-                opt_target.append(1e30)
+                opt_target = 1e30
                 for i in range(n_feat):
                     symm[i, i] -= 10.0**alpha*LE_reg[i]
                 continue
             train_predictions = X_train @ c
             test_predictions = X_test @ c
+            print(torch.sqrt(torch.sum((vec-symm@c)**2)))
 
             print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
             if opt_target_name == "mae":

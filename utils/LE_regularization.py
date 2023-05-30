@@ -3,9 +3,15 @@ import numpy as np
 
 def get_LE_regularization(properties, E_nl, r_cut_rs, r_cut, beta):
 
+    
+    if "z" in properties.names:  # TRACE
+        assert (len(properties.names)-2)%3 == 0
+        nu = (len(properties.names)-2)//3
+    else:
+        assert (len(properties.names)-1)%4 == 0
+        nu = (len(properties.names)-1)//4
+
     eigenvalues = []
-    assert (len(properties.names)-1)%4 == 0
-    nu = (len(properties.names)-1)//4
     for i in range(len(properties["n1"])):
         if nu == 1:
             eigenvalue = E_nl[properties["n1"][i]]*np.exp(beta*nu)

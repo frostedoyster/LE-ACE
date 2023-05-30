@@ -6,6 +6,8 @@ from equistore import TensorBlock, TensorMap
 def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
     # Assumes all center elements are truncated in the same way
 
+    is_trace = True if len(list(unified_anl.keys())[0]) == 2 else False
+
     nu = len(old_map.block(0).properties.names)//4
     block = old_map.block(0)
     
@@ -13,7 +15,10 @@ def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
     for i_feature in range(block.values.shape[-1]):
         I = []
         for iota in range(1, nu+1):
-            index = unified_anl[(block.properties["a"+str(iota)][i_feature], block.properties["n"+str(iota)][i_feature], block.properties["l"+str(iota)][i_feature])]
+            if is_trace:
+                index = unified_anl[(block.properties["n"+str(iota)][i_feature], block.properties["l"+str(iota)][i_feature])]
+            else:
+                index = unified_anl[(block.properties["a"+str(iota)][i_feature], block.properties["n"+str(iota)][i_feature], block.properties["l"+str(iota)][i_feature])]
             I.append(index)
         unique, counts = np.unique(I, return_counts=True)
         multiplicity = math.factorial(nu)
