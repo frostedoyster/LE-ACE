@@ -29,8 +29,6 @@ torch.set_default_dtype(torch.float64)
 
 def run_fit(parameters, n_train, RANDOM_SEED):
 
-    print("5, 1.3, inner")
-
     param_dict = json.load(open(parameters, "r"))
     # RANDOM_SEED = param_dict["random seed"]
     BATCH_SIZE = param_dict["batch size"]
@@ -391,7 +389,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 LE_reg.append(LE_reg_comp)
         LE_reg = torch.concat(LE_reg)
 
-        for alpha in alpha_list:
+        for alpha in alpha_list-beta*1.5:
             #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
             for i in range(n_feat):
                 symm[i, i] += 10**alpha*LE_reg[i]
@@ -416,7 +414,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 continue
             train_predictions = X_train @ c
             test_predictions = X_test @ c
-            print(torch.sqrt(torch.sum((vec-symm@c)**2)))
+            # print("Residual:", torch.sqrt(torch.sum((vec-symm@c)**2)))
 
             print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
             if opt_target_name == "mae":
@@ -439,6 +437,8 @@ def run_fit(parameters, n_train, RANDOM_SEED):
                 symm[i, i] -= 10.0**alpha*LE_reg[i]
 
     print("Best parameters:", best_alpha, best_beta)
+    if best_beta == -2.0 or best_beta == 2.0:
+        print("WARNING: hit grid search boundary")
 
     LE_reg = []
     for nu in range(nu_max+1):

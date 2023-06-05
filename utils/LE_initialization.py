@@ -147,6 +147,7 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
 
 
     # Uncomment this to inspect the spherical expansion
+    """
     if l_max != 0:
         import ase
 
@@ -184,5 +185,6 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
         plt.xlim(0.0, a)
         plt.legend()
         plt.savefig("radial.pdf")
+        """
 
     return calculator

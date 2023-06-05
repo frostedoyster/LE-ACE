@@ -161,9 +161,9 @@ def get_TRACE_expansion(structures, calculator, E_nl, E_max, all_species, contra
         )
 
         if do_gradients:
-            new_gradients = (block.gradient["positions"].values.reshape(
-                block.gradient["positions"].values.shape[:-1] + (n_elems, -1)
-            ).swapaxes(-2, -1) @ contraction_matrix).swapaxes(-2, -1).reshape(block.gradient["positions"].values.shape[:-1] + (-1,))
+            new_gradients = (block.gradient("positions").values.reshape(
+                block.gradient("positions").values.shape[:-1] + (n_elems, -1)
+            ).swapaxes(-2, -1) @ contraction_matrix).swapaxes(-2, -1).reshape(block.gradient("positions").values.shape[:-1] + (-1,))
 
             new_block.add_gradient(
                 parameter="positions",

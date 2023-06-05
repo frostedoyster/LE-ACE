@@ -199,6 +199,7 @@ def initialize_physical_LE(a, rs, E_max, r0, rnn, cost_trade_off):
     )
     print("Number of spline points:", len(spline_points))
 
+    """
     import matplotlib.pyplot as plt
     r = np.linspace(0.1, a-0.001, 1000)
     plt.plot(r, function_for_splining(0, 0, r), label=str(rs))
@@ -206,5 +207,6 @@ def initialize_physical_LE(a, rs, E_max, r0, rnn, cost_trade_off):
     plt.xlim(0.0, a)
     plt.legend()
     plt.savefig("radial-real.pdf")
+    """
 
     return n_max, l_max, E_nl, spline_points
