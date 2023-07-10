@@ -25,11 +25,11 @@ class TRACEIterator(torch.nn.Module):
         do_gradients = TRACE_1.block(0).has_gradient("positions")
 
         l_max = 0
-        for idx, block in TRACE_1:
+        for idx, block in TRACE_1.items():
             l_max = max(l_max, idx["lam"])
 
         lam_max = 0
-        for idx, block in TRACE_nu:
+        for idx, block in TRACE_nu.items():
             lam_max = max(lam_max, idx["lam"])
 
         if self.L_max is None:

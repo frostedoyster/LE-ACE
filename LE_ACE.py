@@ -61,6 +61,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     print(f"Calculating features on {device}")
 
     conversions = {}
+    conversions["NO_CONVERSION"] = 1.0
     conversions["HARTREE_TO_EV"] = 27.211386245988
     conversions["HARTREE_TO_KCAL_MOL"] = 627.509608030593
     conversions["EV_TO_KCAL_MOL"] = conversions["HARTREE_TO_KCAL_MOL"]/conversions["HARTREE_TO_EV"]
@@ -214,7 +215,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
             return tmap
 
         new_blocks = []
-        for _, block in tmap:
+        for _, block in tmap.items():
             new_block = TensorBlock(
                 values=block.values.to("cpu"),
                 samples=block.samples,

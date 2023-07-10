@@ -29,7 +29,7 @@ def apply_multiplicities(old_map: TensorMap, unified_anl) -> TensorMap:
     multiplicities = torch.tensor(multiplicities, device=old_map.block(0).values.device)
 
     new_blocks = []
-    for _, block in old_map:
+    for _, block in old_map.items():
         new_block = TensorBlock(
             values=block.values*multiplicities,
             samples=block.samples,

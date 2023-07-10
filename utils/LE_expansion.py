@@ -12,7 +12,7 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
         species_remapping[species] = i_species
 
     LE_blocks = []
-    for idx, block in map:
+    for idx, block in map.items():
 
         l = idx[0]
         counter = 0
@@ -52,7 +52,7 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
     return TensorMap(
             keys = Labels(
                 names = ("lam", "a_i"),
-                values = map.keys.asarray(),
+                values = map.keys.values,
             ),
             blocks = LE_blocks
         )
@@ -109,7 +109,7 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMa
     return TensorMap(
             keys = Labels(
                 names = ("a_i",),
-                values = map.keys.asarray(),
+                values = map.keys.values,
             ),
             blocks = LE_blocks
         )

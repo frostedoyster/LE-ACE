@@ -33,6 +33,12 @@ def get_dataset_slices(dataset_path, train_slice, test_slice):
         test_structures = all_structures[test_index_begin:test_index_end]
         print("Shuffling and extraction done")
 
+    elif "3bpa" in dataset_path:
+        print("Reading dataset")
+        train_structures = ase.io.read("datasets/3bpa/train_300K.xyz", index = ":500")
+        test_structures = ase.io.read("datasets/3bpa/test_1200K.xyz", index = ":2139")
+        print("Shuffling and extraction done")
+
     else:  # QM7 and QM9 don't seem to be shuffled randomly 
         print("Reading dataset")
         all_structures = ase.io.read(dataset_path, index = ":")
@@ -59,7 +65,7 @@ def get_minimum_distance(structures):
     sd_calculator = rascaline.SortedDistances(**sd_hypers)
     sds = sd_calculator.compute(structures)
     min_distance = 10.0
-    for key, block in sds:
+    for key, block in sds.items():
         min_distance_block = np.min(np.array(block.values))
         min_distance = min(min_distance, min_distance_block)
     print(f"The minimum distance in the dataset is {min_distance}")

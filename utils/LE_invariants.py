@@ -22,11 +22,11 @@ class LEInvariantCalculator(torch.nn.Module):
         do_gradients = LE_1.block(0).has_gradient("positions")
 
         l_max = 0
-        for idx, block in LE_1:
+        for idx, block in LE_1.items():
             l_max = max(l_max, idx["lam"])
 
         lam_max = 0
-        for idx, block in LE_nu:
+        for idx, block in LE_nu.items():
             lam_max = max(lam_max, idx["lam"])
 
         max_l_lam = min(l_max, lam_max)
