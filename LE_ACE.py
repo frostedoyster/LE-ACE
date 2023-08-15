@@ -1,485 +1,298 @@
-import math
 import numpy as np
 import torch
-import equistore
-from datetime import datetime
-import ase
-from ase import io
-
-from utils.dataset_processing import get_dataset_slices, get_minimum_distance
-from utils.error_measures import get_rmse, get_mae
-from utils.cg import ClebschGordanReal
-from utils.composition import get_composition_features
-from utils.lexicographic_multiplicities import apply_multiplicities
-from utils.sum_like_atoms import sum_like_atoms
-
+import rascaline
 from utils.LE_initialization import initialize_basis
+from utils.LE_metadata import get_le_metadata
+from utils.generalized_cgs import get_generalized_cgs
+from utils.LE_iterator import LEIterator
+from utils.ACE_symmetrizer import ACESymmetrizer
+from equistore import Labels
+
 from utils.LE_expansion import get_LE_expansion
-from utils.LE_iterations import LEIterator
-from utils.LE_invariants import LEInvariantCalculator
-from utils.LE_regularization import get_LE_regularization
+from utils.TRACE_expansion import get_TRACE_expansion
 
-from utils.trace.TRACE_expansion import get_TRACE_expansion
-from utils.trace.TRACE_invariants import TRACEInvariantCalculator
-from utils.trace.TRACE_iterations import TRACEIterator
 
-import json
+class LE_ACE(torch.nn.Module):
 
-torch.set_default_dtype(torch.float64)
+    def __init__(
+        self,
+        r_cut_rs,
+        r_cut,
+        E_max,
+        all_species,
+        le_type,
+        factor,
+        factor2,
+        cost_trade_off,
+        is_trace,
+        device
+    ):
+        super().__init__()
 
-def run_fit(parameters, n_train, RANDOM_SEED):
+        nu_max = len(E_max) - 1
+        self.E_max = E_max
+        self.nu_max = nu_max
+        self.device = device
+        self.is_trace = is_trace
 
-    param_dict = json.load(open(parameters, "r"))
-    # RANDOM_SEED = param_dict["random seed"]
-    BATCH_SIZE = param_dict["batch size"]
-    ENERGY_CONVERSION = param_dict["energy conversion"]
-    FORCE_CONVERSION = param_dict["force conversion"]
-    TARGET_KEY = param_dict["target key"]
-    DATASET_PATH = param_dict["dataset path"]
-    n_test = param_dict["n_test"]
-    # n_train = param_dict["n_train"]
-    do_gradients = param_dict["do gradients"]
-    FORCE_WEIGHT = param_dict["force weight"]
-    r_cut = param_dict["r_cut"]
-    r_cut_rs = param_dict["r_cut_rs"]
-    nu_max = param_dict["nu_max"]
-    E_max_coefficients = param_dict["E_max coefficients"]
-    opt_target_name = param_dict["optimization target"]
-    factor = param_dict["factor for radial transform"]
-    cost_trade_off = param_dict["cost_trade_off"]
-    le_type = param_dict["le_type"]
-    dataset_style = param_dict["dataset_style"]
-    inner_smoothing = param_dict["inner_smoothing"]
-    is_trace = param_dict["is_trace"]
-    n_trace = param_dict["n_trace"]
+        self.all_species = all_species
+        self.n_species = len(all_species)
+        self.all_species_tensor = torch.tensor(all_species, dtype=torch.long, device=self.device)
+        self.species_to_species_index = torch.zeros(max(all_species)+1, dtype=torch.long, device=self.device)
+        counter = 0
+        for species in all_species:
+            self.species_to_species_index[species] = counter
+            counter +=1
+        print("Self species to species index", self.species_to_species_index)
 
-    np.random.seed(RANDOM_SEED)
-    print(f"Random seed: {RANDOM_SEED}")
+        _, self.E_n0, radial_spectrum_calculator = initialize_basis(r_cut_rs, True, E_max[1], le_type, factor, factor2)
+        self.n_max_rs = np.where(self.E_n0 <= E_max[1])[0][-1] + 1
+        l_max, self.E_nl, spherical_expansion_calculator = initialize_basis(r_cut, False, E_max[2], le_type, factor, factor2, cost_trade_off=cost_trade_off)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    # device = "cpu"
-    print(f"Calculating features on {device}")
-
-    conversions = {}
-    conversions["NO_CONVERSION"] = 1.0
-    conversions["HARTREE_TO_EV"] = 27.211386245988
-    conversions["HARTREE_TO_KCAL_MOL"] = 627.509608030593
-    conversions["EV_TO_KCAL_MOL"] = conversions["HARTREE_TO_KCAL_MOL"]/conversions["HARTREE_TO_EV"]
-    conversions["KCAL_MOL_TO_MEV"] = 0.0433641153087705*1000.0
-    conversions["METHANE_FORCE"] = conversions["HARTREE_TO_KCAL_MOL"]/0.529177
-
-    CONVERSION_FACTOR = conversions[ENERGY_CONVERSION]
-    FORCE_CONVERSION_FACTOR = conversions[FORCE_CONVERSION]
-
-    print("Dataset path: " + DATASET_PATH)
-    print("Factor:", factor)
-
-    if "methane" in DATASET_PATH or "ch4" in DATASET_PATH or "rmd17" in DATASET_PATH or "gold" in DATASET_PATH:
-        n_elems = len(np.unique(ase.io.read(DATASET_PATH, index = "0:1")[0].get_atomic_numbers()))
-        print(f"n_elems: {n_elems}")
-
-    if do_gradients:
-        N = len(ase.io.read(DATASET_PATH, index = "0:1")[0].get_atomic_numbers())
-        print(f"Number of atoms in each molecule: {N}")
-        three_N_plus_one = 3*N+1
-        n_train_effective = n_train*three_N_plus_one
-    else:
-        n_train_effective = n_train
-
-    E_max = E_max_coefficients
-    print(E_max)
-
-    if not np.all(np.array(E_max[:-1]) >= np.array(E_max[1:])): print("LE WARNING: max eigenvalues not in descending order")
-    assert len(E_max) == nu_max + 1 
-
-    # Decrease nu_max if LE threshold is too low:
-    for iota in range(1, nu_max+1):
-        if E_max[iota] < iota*np.pi**2:
-            print(f"Decreasing nu_max to {iota-1}")
-            nu_max = iota-1
-            break
-
-    if nu_max < 2:
-        raise ValueError("Trying to use ACE with nu_max < 2? Why?")
-
-    if "rmd17" in DATASET_PATH:
-        train_slice = str(0) + ":" + str(n_train)
-        test_slice = str(0) + ":" + str(n_test)
-    else:
-        test_slice = str(0) + ":" + str(n_test)
-        train_slice = str(n_test) + ":" + str(n_test+n_train)
-
-    train_structures, test_structures = get_dataset_slices(DATASET_PATH, train_slice, test_slice)
-
-    min_training_set_distance = get_minimum_distance(train_structures)
-    if inner_smoothing:
-        factor2 = min_training_set_distance
-    else:
-        factor2 = 0.0
-
-    train_energies = torch.tensor([structure.info[TARGET_KEY] for structure in train_structures])*CONVERSION_FACTOR
-    test_energies = torch.tensor([structure.info[TARGET_KEY] for structure in test_structures])*CONVERSION_FACTOR
-
-    if do_gradients:
-        train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
-        test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
-
-    all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
-    n_elems = len(all_species)
-    print(f"All species: {all_species}")
-
-    _, E_n0, radial_spectrum_calculator = initialize_basis(r_cut_rs, True, E_max[1], le_type, factor, factor2)
-    print(E_n0)
-    l_max, E_nl, spherical_expansion_calculator = initialize_basis(r_cut, False, E_max[2], le_type, factor, factor2, cost_trade_off=cost_trade_off)
-    print(E_nl)
-
-    n_max_l = []
-    for l in range(l_max+1):
-        n_max_l.append(np.where(E_nl[:, l] <= E_max[2])[0][-1] + 1)
-    print(n_max_l)
-
-    # anl counter:
-    if is_trace:
-        a_max = 1  # Pseudo-element channels don't couple to one another
-    else:
-        a_max = n_elems
-    combined_anl = {}
-    anl_counter = 0
-    for a in range(a_max):
+        E_ln = self.E_nl.T
+        n_max_l = []
         for l in range(l_max+1):
-            for n in range(n_max_l[l]):
-                if is_trace:
-                    combined_anl[(n, l)] = anl_counter
-                else:
-                    combined_anl[(a, n, l,)] = anl_counter
-                anl_counter += 1
+            n_max_l.append(np.where(self.E_nl[:, l] <= E_max[2])[0][-1] + 1)
+        print(self.n_max_rs)
+        print(n_max_l)
+        E_ln = [E_ln[l][:n_max_l[l]] for l in range(l_max+1)]
 
-    invariant_calculator = TRACEInvariantCalculator(E_nl, combined_anl, all_species) if is_trace else LEInvariantCalculator(E_nl, combined_anl, all_species)
-    alg = "fast cg" if device=="cpu" else "dense"
-    cg_object = ClebschGordanReal(device=device, algorithm=alg)
-    equivariant_calculator = TRACEIterator(E_nl, combined_anl, all_species, cg_object) if is_trace else LEIterator(E_nl, combined_anl, all_species, cg_object)  # L_max=3
+        self.combine_indices, self.multiplicities, self.LE_energies = get_le_metadata(all_species, E_max, n_max_l, E_ln, is_trace, device)
 
-    if is_trace:
-        trace_comb = torch.tensor(np.random.normal(size=(n_elems, n_trace)))
+        l_tuples = [0, 1] + [list(self.combine_indices[nu].keys()) for nu in range(2, nu_max+1)]
+        requested_L_sigma_pairs = [(0, 1)]
+        self.generalized_cgs = get_generalized_cgs(l_tuples, requested_L_sigma_pairs, nu_max, device)
+        necessary_l_tuples_nu_max = []
+        for requested_L_sigma_pair in requested_L_sigma_pairs:
+            necessary_l_tuples_nu_max.extend(list(self.generalized_cgs[requested_L_sigma_pair][nu_max].keys()))
 
-    def get_LE_invariants(structures):
+        # For correlation order nu, remove unncecessary indices that violate the parity constraints:
+        keys_to_pop = []
+        for l_tuple_nu_max in self.combine_indices[nu_max].keys():
+            if l_tuple_nu_max not in necessary_l_tuples_nu_max:
+                keys_to_pop.append(l_tuple_nu_max)
+        
+        for l_tuple_nu_max in keys_to_pop:
+            self.combine_indices[nu_max].pop(l_tuple_nu_max)
+            self.multiplicities[nu_max].pop(l_tuple_nu_max)
+            self.LE_energies[nu_max].pop(l_tuple_nu_max)
 
-        print("Calculating composition features")
-        comp = get_composition_features(structures, all_species)
-        print("Composition features done")
+        self.fixed_order_l_tuples = [0, 1] + [list(self.generalized_cgs[(0, 1)][nu].keys()) for nu in range(2, nu_max+1)]  # Needed to have consistent ordering when concatenating
 
-        if is_trace:
-            rs = get_TRACE_expansion(structures, radial_spectrum_calculator, E_n0, E_max[1], all_species, trace_comb, rs=True, do_gradients=do_gradients)
-            spherical_expansion = get_TRACE_expansion(structures, spherical_expansion_calculator, E_nl, E_max[2], all_species, trace_comb, do_gradients=do_gradients, device=device)
-        else:
-            rs = get_LE_expansion(structures, radial_spectrum_calculator, E_n0, E_max[1], all_species, rs=True, do_gradients=do_gradients)
-            spherical_expansion = get_LE_expansion(structures, spherical_expansion_calculator, E_nl, E_max[2], all_species, do_gradients=do_gradients, device=device)
-
-        invariants = [rs]
-
-        if nu_max > 1: equivariants_nu_minus_one = spherical_expansion
-
-        for nu in range(2, nu_max+1):
-
-            print(f"Calculating nu = {nu} invariants")
-            invariants_nu = invariant_calculator(equivariants_nu_minus_one, spherical_expansion, E_max[nu])
-            invariants_nu = apply_multiplicities(invariants_nu, combined_anl)
-            invariants.append(invariants_nu)
-
-            if nu == nu_max: break  # equivariants for nu_max wouldn't be used
-
-            print(f"Calculating nu = {nu} equivariants")
-            equivariants_nu = equivariant_calculator(equivariants_nu_minus_one, spherical_expansion, E_max[nu+1])
-            equivariants_nu_minus_one = equivariants_nu
-
-        X = sum_like_atoms(invariants)
-        return comp, X
-
-
-    # Divide training and test set into batches (to limit memory usage):
-    def get_batches(list: list, batch_size: int) -> list:
-        batches = []
-        n_full_batches = len(list)//batch_size
-        for i_batch in range(n_full_batches):
-            batches.append(list[i_batch*batch_size:(i_batch+1)*batch_size])
-        if len(list) % batch_size != 0:
-            batches.append(list[n_full_batches*batch_size:])
-        return batches
-
-    train_structures = get_batches(train_structures, BATCH_SIZE)
-    test_structures = get_batches(test_structures, BATCH_SIZE)
-
-    from equistore import TensorBlock, TensorMap
-    def to_cpu(tmap):
-        if tmap.block(0).values.device == "cpu":
-            return tmap
-
-        new_blocks = []
-        for _, block in tmap.items():
-            new_block = TensorBlock(
-                values=block.values.to("cpu"),
-                samples=block.samples,
-                components=block.components,
-                properties=block.properties
-            )
-            if block.has_gradient("positions"):
-                old_gradients = block.gradient("positions")
-                new_block.add_gradient(
-                    parameter="positions",
-                    gradient=TensorBlock(
-                        values=old_gradients.values.to("cpu"),
-                        samples=old_gradients.samples,
-                        components=old_gradients.components,
-                        properties=old_gradients.properties
-                    )
-                )
-            new_blocks.append(new_block)
-        return TensorMap(
-            keys=tmap.keys,
-            blocks=new_blocks
-        )
-
-    train_comp = []
-    if do_gradients: train_dcomp = []
-    X_train = []
-    for i_batch, batch in enumerate(train_structures):
-        print(f"DOING TRAIN BATCH {i_batch+1} out of {len(train_structures)}")
-        comp, X = get_LE_invariants(batch)
-
-        if dataset_style == "mixed":
-            comp = comp.values.to(device)
-        elif dataset_style == "MD":
-            comp = torch.ones((X[0].block(0).values.shape[0], 1))
-        else:
-            raise NotImplementedError("The dataset_style must be either MD or mixed")
-        train_comp.append(comp)
-      
-        if do_gradients:    
-            if dataset_style == "mixed":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, len(all_species)))
-            elif dataset_style == "MD":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, 1))
-            else:
-                raise NotImplementedError("The dataset_style must be either MD or mixed")
-            train_dcomp.append(dcomp)
-
-        moved_X = []
-        for tmap in X:
-            moved_tmap = tmap.keys_to_properties(keys_to_move="a_i")
-            moved_X.append(to_cpu(moved_tmap))
-        # The equistore to function here would allow for much better memory management
-        X_train.append(moved_X)
-
-        if i_batch == 0:
-            for nu_ in range(nu_max):
-                print(f"nu={1+nu_}: {X_train[0][nu_].block().values.shape[1]}")
-
-    properties = [X_train[0][nu-1].block().properties for nu in range(1, nu_max+1)]
-
-    if dataset_style == "mixed":
-        LE_reg_comp = torch.tensor([0.0]*len(all_species))
-        # LE_reg_comp = torch.tensor([1e-4]*len(species))  # this seems to work ok; needs more testing 
-    elif dataset_style == "MD":
-        LE_reg_comp = torch.tensor([0.0])
-    else:
-        raise NotImplementedError("The dataset_style must be either MD or mixed")
-
-    X_train_batches = []
-    if do_gradients: dX_train_batches = []
-    for i_batch, batch in enumerate(X_train):
-        processed_batch = [batch[nu-1].block().values for nu in range(1, nu_max+1)]
-        processed_batch = torch.concat([train_comp[i_batch]]+processed_batch, dim=-1)
-        X_train_batches.append(processed_batch)
-        if do_gradients:
-            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").values.cpu().reshape(batch[nu-1].block().gradient("positions").values.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(1, nu_max+1)]
-            d_processed_batch = torch.concat([train_dcomp[i_batch]]+d_processed_batch, dim=-1)
-            dX_train_batches.append(d_processed_batch)
-
-    if do_gradients:
-        X_train = torch.concat(X_train_batches + dX_train_batches, dim = 0)
-    else:
-        X_train = torch.concat(X_train_batches, dim = 0)
-
-    test_comp = []
-    if do_gradients: test_dcomp = []
-    X_test = []
-    for i_batch, batch in enumerate(test_structures):
-        print(f"DOING TEST BATCH {i_batch+1} out of {len(test_structures)}")
-        comp, X = get_LE_invariants(batch)
-
-        if dataset_style == "mixed":
-            comp = comp.values.to(device)
-        elif dataset_style == "MD":
-            comp = torch.ones((X[0].block(0).values.shape[0], 1))
-        else:
-            raise NotImplementedError("The dataset_style must be either MD or mixed")
-        test_comp.append(comp)
-      
-        if do_gradients:    
-            if dataset_style == "mixed":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, len(all_species)))
-            elif dataset_style == "MD":
-                dcomp = torch.zeros((X[0].block(0).gradient("positions").values.shape[0]*3, 1))
-            else:
-                raise NotImplementedError("The dataset_style must be either MD or mixed")
-            test_dcomp.append(dcomp)
-
-        moved_X = []
-        for tmap in X:
-            moved_tmap = tmap.keys_to_properties(keys_to_move="a_i")
-            moved_X.append(to_cpu(moved_tmap))
-        X_test.append(moved_X)
-
-    X_test_batches = []
-    if do_gradients: dX_test_batches = []
-    for i_batch, batch in enumerate(X_test):
-        processed_batch = [batch[nu-1].block().values for nu in range(1, nu_max+1)]
-        processed_batch = torch.concat([test_comp[i_batch]]+processed_batch, dim=-1)
-        X_test_batches.append(processed_batch)
-        if do_gradients:
-            d_processed_batch = [-FORCE_WEIGHT*batch[nu-1].block().gradient("positions").values.cpu().reshape(batch[nu-1].block().gradient("positions").values.shape[0]*3, batch[nu-1].block().values.shape[1]) for nu in range(1, nu_max+1)]
-            d_processed_batch = torch.concat([test_dcomp[i_batch]]+d_processed_batch, dim=-1)
-            dX_test_batches.append(d_processed_batch)
-
-    if do_gradients:
-        X_test = torch.concat(X_test_batches + dX_test_batches, dim = 0)
-    else:
-        X_test = torch.concat(X_test_batches, dim = 0)
-
-    print("Features done")
-
-    print("Beginning hyperparameter optimization")
-
-    if do_gradients:
-        train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
-        test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
-    else:
-        train_targets = train_energies
-        #train_targets = torch.concat([train_energies, torch.tensor([0.0])])
-        test_targets = test_energies
-
-    symm = X_train.T @ X_train
-    vec = X_train.T @ train_targets
-    alpha_list = np.linspace(-12.5, -2.5, 21)
-    if "qm9" in DATASET_PATH:
-        alpha_list = np.linspace(-15.0, 5.0, 21)
-
-    # alpha_list = np.linspace(-10.0, 10.0, 41)
-    n_feat = X_train.shape[1]
-    print("Number of features: ", n_feat)
-
-    # from torch_mkl64 import mkl64
-    # from scipy.sparse.linalg import cg
-
-    best_opt_target = 1e30
-    for beta in ([-1.0, 0.0, 1.0, 2.0, 3.0, 4.0] if "qm9" in DATASET_PATH else [-2.0, -1.0, 0.0, 1.0, 2.0]):  # reproduce
-
-        print("beta=", beta)
-
-        LE_reg = []
-        for nu in range(nu_max+1):
-            if nu > 1:
-                LE_reg.append(
-                    get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, beta)
-                )
+        # Build extended LE_energies according to L_tuple and a_i:
+        self.extended_LE_energies = []
+        for nu in range(self.nu_max+1):
+            if nu == 0:
+                extended_LE_energies_nu = torch.tensor([0.0], dtype=torch.get_default_dtype(), device=self.device)
             elif nu == 1:
-                LE_reg.append(
-                    get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, beta)
+                extended_LE_energies_nu = torch.tile(
+                    torch.tensor(self.E_n0[:self.n_max_rs], dtype=torch.get_default_dtype(), device=self.device),
+                    (self.n_species**2,)
                 )
             else:
-                LE_reg.append(LE_reg_comp)
-        LE_reg = torch.concat(LE_reg)
+                extended_LE_energies_nu = []
+                for l_tuple in self.fixed_order_l_tuples[nu]:
+                    extended_LE_energies_nu.append(
+                        torch.tile(
+                            self.LE_energies[nu][l_tuple],
+                            (self.n_species*self.generalized_cgs[(0, 1)][nu][l_tuple].shape[0],)  # Account for L (as well as a_i)
+                        )
+                    )
+                extended_LE_energies_nu = torch.concatenate(extended_LE_energies_nu)
+            self.extended_LE_energies.append(extended_LE_energies_nu)
+        print([tensor.shape for tensor in self.extended_LE_energies])
 
-        for alpha in alpha_list-beta*1.5:
-            #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
-            for i in range(n_feat):
-                symm[i, i] += 10**alpha*LE_reg[i]
+        self.nu0_calculator_train = rascaline.AtomicComposition(per_structure=False)
+        self.radial_spectrum_calculator_train = radial_spectrum_calculator
+        self.spherical_expansion_calculator_train = spherical_expansion_calculator
+        self.le_iterator = LEIterator(self.combine_indices, self.multiplicities)
+        self.ace_symmetrizer = ACESymmetrizer(self.generalized_cgs)
 
-            try:
-                # c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
-                c = torch.linalg.solve(symm, vec)
-                # c, info = cg(symm.numpy(force=True), vec.numpy(force=True), atol=1e-10, tol=1e-12)
-                # c = torch.tensor(c)
-                """if info != 0:
-                    print(info)
-                    opt_target.append(1e30)
-                    for i in range(n_feat):
-                        symm[i, i] -= 10.0**alpha*LE_reg[i]
-                    continue"""
-                # c = mkl64.dposv(symm, vec)
-            except Exception as e:
-                print(e)
-                opt_target = 1e30
-                for i in range(n_feat):
-                    symm[i, i] -= 10.0**alpha*LE_reg[i]
-                continue
-            train_predictions = X_train @ c
-            test_predictions = X_test @ c
-            # print("Residual:", torch.sqrt(torch.sum((vec-symm@c)**2)))
+    def compute_features(self, structures, forward_gradients=False):
 
-            print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
-            if opt_target_name == "mae":
-                if do_gradients:
-                    opt_target = get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
-                else:
-                    opt_target = get_mae(test_predictions[:n_test], test_targets[:n_test]).item()
-            else:
-                if do_gradients:
-                    opt_target = get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
-                else:    
-                    opt_target = get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()
+        n_structures = len(structures)
+        gradients = (["positions"] if forward_gradients else None)
 
-            if opt_target < best_opt_target:
-                best_opt_target = opt_target
-                best_alpha = alpha
-                best_beta = beta
+        composition_features_tmap = self.nu0_calculator_train.compute(structures, gradients=gradients)
+        composition_features_tmap = composition_features_tmap.keys_to_samples("species_center")
 
-            for i in range(n_feat):
-                symm[i, i] -= 10.0**alpha*LE_reg[i]
-
-    print("Best parameters:", best_alpha, best_beta)
-    if best_beta == -2.0 or best_beta == 2.0:
-        print("WARNING: hit grid search boundary")
-
-    LE_reg = []
-    for nu in range(nu_max+1):
-        if nu > 1:
-            LE_reg.append(
-                get_LE_regularization(properties[nu-1], E_nl, r_cut_rs, r_cut, best_beta)
-            )
-        elif nu == 1:
-            print(E_n0)
-            LE_reg.append(
-                get_LE_regularization(properties[nu-1], E_n0, r_cut_rs, r_cut, best_beta)
-            )
+        if self.is_trace:
+            radial_spectrum_tmap = get_TRACE_expansion(structures, radial_spectrum_calculator_train, self.E_n0, E_max[1], all_species, trace_comb, rs=True, do_gradients=forward_gradients)
+            spherical_expansion_tmap = get_TRACE_expansion(structures, spherical_expansion_calculator_train, E_nl, E_max[2], all_species, trace_comb, do_gradients=forward_gradients, device=self.device)
         else:
-            LE_reg.append(LE_reg_comp)
-    LE_reg = torch.concat(LE_reg)
+            radial_spectrum_tmap = get_LE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, rs=True, do_gradients=forward_gradients)
+            spherical_expansion_tmap = get_LE_expansion(structures, self.spherical_expansion_calculator_train, self.E_nl, self.E_max[2], self.all_species, do_gradients=forward_gradients, device=self.device)
 
-    for i in range(n_feat):
-        symm[i, i] += 10**best_alpha*LE_reg[i]
-    c = torch.linalg.solve(symm, vec)
+        radial_spectrum_tmap = radial_spectrum_tmap.keys_to_samples("a_i")
+        spherical_expansion_tmap = spherical_expansion_tmap.keys_to_samples("a_i")
 
-    test_predictions = X_test @ c
-    print("n_train:", n_train, "n_features:", n_feat)
-    print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT}]")
+        comp_metadata = torch.tensor(composition_features_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
+        rs_metadata = torch.tensor(radial_spectrum_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
+        spex_metadata = torch.tensor(spherical_expansion_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
 
-    # Uncomment for speed evaluation
-    """
+        composition_features = torch.tensor(composition_features_tmap.block(0).values, dtype=torch.get_default_dtype(), device=self.device)
+        radial_spectrum = torch.tensor(radial_spectrum_tmap.block(0).values, dtype=torch.get_default_dtype(), device=self.device)
+        spherical_expansion = {(l,): block.values.swapaxes(0, 2) for (l,), block in spherical_expansion_tmap.items()}
+
+        if forward_gradients:
+            comp_grad_metadata = torch.tensor(composition_features_tmap.block(0).gradient("positions").samples.values, dtype=torch.long, device=self.device)
+            rs_grad_metadata = torch.tensor(radial_spectrum_tmap.block(0).gradient("positions").samples.values, dtype=torch.long, device=self.device)
+            spex_grad_metadata = torch.tensor(spherical_expansion_tmap.block(0).gradient("positions").samples.values, dtype=torch.long, device=self.device)
+
+            composition_features_grad = torch.tensor(composition_features_tmap.block(0).gradient("positions").values, dtype=torch.get_default_dtype(), device=self.device)
+            radial_spectrum_grad = torch.tensor(radial_spectrum_tmap.block(0).gradient("positions").values, dtype=torch.get_default_dtype(), device=self.device)
+            spherical_expansion_grad = {
+                (l,): block.gradient("positions").values.reshape(-1, block.gradient("positions").values.shape[1], block.gradient("positions").values.shape[2]).swapaxes(0, 2).reshape(
+                    block.gradient("positions").values.shape[3],
+                    block.gradient("positions").values.shape[2],
+                    block.gradient("positions").values.shape[0],
+                    block.gradient("positions").values.shape[1]
+                )
+                for (l,), block in spherical_expansion_tmap.items()
+            }
+
+        print("Calculating A basis")
+        if forward_gradients:
+            A_basis, A_basis_gradients = self.le_iterator.compute_with_gradients(spherical_expansion, spherical_expansion_grad, spex_grad_metadata[:, 0])
+        else:
+            A_basis = self.le_iterator(spherical_expansion)
+        print("Calculating B basis")
+        if forward_gradients:
+            B_basis, B_basis_gradients = self.ace_symmetrizer.compute_with_gradients(A_basis, A_basis_gradients)
+            B_basis = B_basis[(0, 1)]
+            B_basis_grad = B_basis_gradients[(0, 1)]
+        else:
+            B_basis = self.ace_symmetrizer(A_basis)
+            B_basis = B_basis[(0, 1)]
+        print("Finished B basis")
+
+
+        
+        # Concatenate different features at the same body_order:
+        B_basis_concatenated = [composition_features, radial_spectrum]
+        for nu in range(2, self.nu_max+1):
+            features_nu = [B_basis[nu][l_tuple].squeeze(0) for l_tuple in self.fixed_order_l_tuples[nu]]
+            B_basis_concatenated.append(
+                torch.concatenate(features_nu).T
+            )
+        if forward_gradients:
+            B_basis_concatenated_grad = [composition_features_grad, radial_spectrum_grad]
+            for nu in range(2, self.nu_max+1):
+                gradients_nu = [B_basis_grad[nu][l_tuple].squeeze(0) for l_tuple in self.fixed_order_l_tuples[nu]]
+                B_basis_concatenated_grad.append(
+                    torch.concatenate(gradients_nu).moveaxis(0, 2)
+                )
+
+        # Sum over like-atoms in each structure:
+
+        sum_indices_comp = self.n_species*comp_metadata[:, 0]+self.species_to_species_index[comp_metadata[:, 2]]
+        sum_indices_rs = self.n_species*rs_metadata[:, 0]+self.species_to_species_index[rs_metadata[:, 2]]
+        sum_indices_spex = self.n_species*spex_metadata[:, 0]+self.species_to_species_index[spex_metadata[:, 2]]
+        B_basis_per_structure = []
+        for nu in range(0, self.nu_max+1):
+            if nu == 0:
+                B_basis_per_structure_nu = torch.zeros(
+                    n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
+                ).index_add_(0, sum_indices_comp, B_basis_concatenated[nu])
+                B_basis_per_structure_nu = B_basis_per_structure_nu.reshape(n_structures, -1).sum(dim=1)
+            elif nu == 1:
+                B_basis_per_structure_nu = torch.zeros(
+                    n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
+                ).index_add_(0, sum_indices_rs, B_basis_concatenated[nu])
+            else:
+                B_basis_per_structure_nu = torch.zeros(
+                    n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
+                ).index_add_(0, sum_indices_spex, B_basis_concatenated[nu])
+            B_basis_per_structure.append(
+                B_basis_per_structure_nu.reshape(n_structures, -1)
+            )
+
+        if forward_gradients:
+            n_force_centers = sum([structure.positions.shape[0] for structure in structures])
+            structure_offsets = torch.tensor(np.cumsum([0]+[structure.positions.shape[0] for structure in structures[:-1]]), dtype=torch.long, device=self.device)
+            sum_indices_comp_grad = self.n_species*(structure_offsets[comp_grad_metadata[:, 1]]+comp_grad_metadata[:, 2])+self.species_to_species_index[comp_metadata[comp_grad_metadata[:, 0], 2]]
+            sum_indices_rs_grad = self.n_species*(structure_offsets[rs_grad_metadata[:, 1]]+rs_grad_metadata[:, 2])+self.species_to_species_index[rs_metadata[rs_grad_metadata[:, 0], 2]]
+            sum_indices_spex_grad = self.n_species*(structure_offsets[spex_grad_metadata[:, 1]]+spex_grad_metadata[:, 2])+self.species_to_species_index[spex_metadata[spex_grad_metadata[:, 0], 2]]
+
+            B_basis_per_structure_grad = []
+            for nu in range(0, self.nu_max+1):
+                if nu == 0:
+                    B_basis_per_structure_nu_grad = torch.zeros(
+                        n_force_centers*self.n_species, 3, B_basis_concatenated_grad[nu].shape[2], dtype=torch.get_default_dtype(), device=self.device
+                    ).index_add_(0, sum_indices_comp_grad, B_basis_concatenated_grad[nu])
+                    B_basis_per_structure_nu_grad = B_basis_per_structure_nu_grad.reshape(n_force_centers, self.n_species, 3, -1)
+                elif nu == 1:
+                    B_basis_per_structure_nu_grad = torch.zeros(
+                        n_force_centers*self.n_species, 3, B_basis_concatenated_grad[nu].shape[2], dtype=torch.get_default_dtype(), device=self.device
+                    ).index_add_(0, sum_indices_rs_grad, B_basis_concatenated_grad[nu])
+                else:
+                    B_basis_per_structure_nu_grad = torch.zeros(
+                        n_force_centers*self.n_species, 3, B_basis_concatenated_grad[nu].shape[2], dtype=torch.get_default_dtype(), device=self.device
+                    ).index_add_(0, sum_indices_spex_grad, B_basis_concatenated_grad[nu])
+                
+                B_basis_per_structure_nu_grad = B_basis_per_structure_nu_grad.reshape(n_force_centers, self.n_species, 3, -1).swapaxes(1, 2).reshape(n_force_centers, 3, -1)
+                if nu == 0: B_basis_per_structure_nu_grad = B_basis_per_structure_nu_grad.sum(dim=2, keepdim=True)
+                B_basis_per_structure_grad.append(B_basis_per_structure_nu_grad)
+        
+        # Concatenate different body-orders:
+        print([B_basis_per_structure[nu].shape for nu in range(0, self.nu_max+1)])
+        B_basis_all_together = torch.concatenate([B_basis_per_structure[nu] for nu in range(0, self.nu_max+1)], dim=1)
+        if forward_gradients: B_basis_all_together_grad = torch.concatenate([B_basis_per_structure_grad[nu] for nu in range(0, self.nu_max+1)], dim=2)
+
+        # print(B_basis_all_together.shape[0], B_basis_all_together.shape[1])
+        # print(B_basis_all_together_grad.shape[0], B_basis_all_together_grad.shape[1], B_basis_all_together_grad.shape[2])
+        if not forward_gradients: B_basis_all_together_grad = None
+
+        return B_basis_all_together, B_basis_all_together_grad
+
+
+    def train(train_structures, validation_structures):
+        pass
+
+
+if __name__ == "__main__":
+    torch.set_default_dtype(torch.float64)
+    np.random.seed(2)
+    dictionary = {
+        "r_cut_rs": 4.0,
+        "r_cut": 4.0,
+        "E_max": [1e+30, 100.0, 25.0],
+        "all_species": [1, 6],
+        "le_type": "pure",
+        "factor": 1.0,
+        "factor2": 0.6,
+        "cost_trade_off": False,
+        "device": "cpu",
+        "is_trace": False,
+    }
+    le_ace = LE_ACE(**dictionary)
+
+    DATASET_PATH = "datasets/rmd17/benzene1.extxyz"
+    train_slice = "5:10"
+    test_slice = "1000:1005"
+
+    import ase
     from ase import io
-    for length_exp in range(0, 10):
-        length = 2**length_exp
-        dummy_structure = ase.io.read(DATASET_PATH, index = ":" + str(length))
-        import time
-        time_before = time.time()
-        for _ in range(10):
-            X, dX, LE_reg = get_LE_invariants(dummy_structure)
-            # e = X@c
-        print()
-        print()
-        print()
-        print(length, (time.time()-time_before)/10)
-        print()
-        print()
-        print()
-    """
+
+    train_structures = ase.io.read(DATASET_PATH, train_slice)
+    test_structures = ase.io.read(DATASET_PATH, test_slice)
+
+    train_values, train_gradients = le_ace.compute_features(train_structures, forward_gradients=True)
+
+    delta = 1e-5
+    structure_counter = 0
+    counter = 0
+    for structure in train_structures:
+        for i_atom in range(structure.positions.shape[0]):
+            for alpha in range(3):
+                train_structures[structure_counter].positions[i_atom, alpha] += delta
+                train_values_plus, _ = le_ace.compute_features(train_structures)
+                train_structures[structure_counter].positions[i_atom, alpha] -= 2.0*delta
+                train_values_minus, _ = le_ace.compute_features(train_structures)
+                train_structures[structure_counter].positions[i_atom, alpha] += delta
+                numerical_derivative = (train_values_plus[structure_counter] - train_values_minus[structure_counter])/(2.0*delta)
+                print(numerical_derivative)
+                print(train_gradients[counter][alpha])
+                assert torch.allclose(numerical_derivative, train_gradients[counter][alpha])
+            counter += 1
+        structure_counter += 1

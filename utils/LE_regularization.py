@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-def get_LE_regularization(properties, E_nl, r_cut_rs, r_cut, beta):
+def get_LE_regularization(properties, LE_energies, r_cut_rs, r_cut, beta):
 
     
     if "z" in properties.names:  # TRACE
