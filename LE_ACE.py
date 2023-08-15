@@ -136,10 +136,14 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     X_train_batches_grad = []
     for i_batch, batch in enumerate(train_structures):
         print(f"DOING TRAIN BATCH {i_batch+1} out of {len(train_structures)}")
-        values, gradients = le_ace.compute_with_gradients(batch)
-        gradients = -FORCE_WEIGHT*gradients.reshape(gradients.shape[0]*3, values.shape[1])
-        X_train_batches.append(values)
-        X_train_batches_grad.append(gradients)
+        if do_gradients:
+            values, gradients = le_ace.compute_with_gradients(batch)
+            gradients = -FORCE_WEIGHT*gradients.reshape(gradients.shape[0]*3, values.shape[1])
+            X_train_batches.append(values)
+            X_train_batches_grad.append(gradients)
+        else:
+            values = le_ace(batch)
+            X_train_batches.append(values)
 
     if do_gradients:
         X_train = torch.concat(X_train_batches + X_train_batches_grad, dim = 0)
@@ -150,10 +154,14 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     X_test_batches_grad = []
     for i_batch, batch in enumerate(test_structures):
         print(f"DOING TEST BATCH {i_batch+1} out of {len(test_structures)}")
-        values, gradients = le_ace.compute_with_gradients(batch)
-        gradients = -FORCE_WEIGHT*gradients.reshape(gradients.shape[0]*3, values.shape[1])
-        X_test_batches.append(values)
-        X_test_batches_grad.append(gradients)
+        if do_gradients:
+            values, gradients = le_ace.compute_with_gradients(batch)
+            gradients = -FORCE_WEIGHT*gradients.reshape(gradients.shape[0]*3, values.shape[1])
+            X_test_batches.append(values)
+            X_test_batches_grad.append(gradients)
+        else:
+            values = le_ace(batch)
+            X_test_batches.append(values)
 
     if do_gradients:
         X_test = torch.concat(X_test_batches + X_test_batches_grad, dim = 0)
