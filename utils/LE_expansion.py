@@ -13,6 +13,8 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
 
     LE_blocks = []
     for idx, block in map.items():
+        # BUG: if the LE threshold is very low and only a l = 0 block is present, the l key will not appear, 
+        # the l index below will take the the value of the first a_i and the code will most likely crash due to shape mismatches
 
         l = idx[0]
         counter = 0
