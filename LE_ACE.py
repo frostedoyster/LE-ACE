@@ -94,12 +94,12 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     else:
         factor2 = 0.0
 
-    train_energies = torch.tensor([structure.info[TARGET_KEY] for structure in train_structures])*CONVERSION_FACTOR
-    test_energies = torch.tensor([structure.info[TARGET_KEY] for structure in test_structures])*CONVERSION_FACTOR
+    train_energies = torch.tensor([structure.info[TARGET_KEY] for structure in train_structures], dtype=torch.get_default_dtype(), device=device)*CONVERSION_FACTOR
+    test_energies = torch.tensor([structure.info[TARGET_KEY] for structure in test_structures], dtype=torch.get_default_dtype(), device=device)*CONVERSION_FACTOR
 
     if do_gradients:
-        train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
-        test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0))*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
+        train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0), dtype=torch.get_default_dtype(), device=device)*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
+        test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0), dtype=torch.get_default_dtype(), device=device)*FORCE_CONVERSION_FACTOR*FORCE_WEIGHT
 
     all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
     n_elems = len(all_species)
