@@ -92,13 +92,12 @@ class LE_ACE(torch.nn.Module):
             else:
                 extended_LE_energies_nu = []
                 for l_tuple in self.fixed_order_l_tuples[nu]:
-                    extended_LE_energies_nu.append(
-                        torch.tile(
-                            self.LE_energies[nu][l_tuple],
-                            (self.n_species*self.generalized_cgs[(0, 1)][nu][l_tuple].shape[0],)  # Account for L (as well as a_i)
-                        )
-                    )
+                    extended_LE_energies_nu.append(self.LE_energies[nu][l_tuple])
                 extended_LE_energies_nu = torch.concatenate(extended_LE_energies_nu)
+                extended_LE_energies_nu = torch.tile(
+                    extended_LE_energies_nu,
+                    (self.n_species*self.generalized_cgs[(0, 1)][nu][l_tuple].shape[0],)  # Account for L (as well as a_i)
+                )
             self.extended_LE_energies.append(extended_LE_energies_nu)
         print([tensor.shape[0] for tensor in self.extended_LE_energies])
 

@@ -58,7 +58,6 @@ def get_le_metadata(all_species, E_max, n_max_l, E_ln, is_trace, device):
                 if l_tuple_nu_minus_one[-1] > l: continue
                 b_1_l = b_1[(l,)]
                 l_tuple_nu = l_tuple_nu_minus_one + (l,)
-                # print(l_tuple_nu)
                 LE_energies[nu][l_tuple_nu] = []
                 b_nu[l_tuple_nu] = []
                 combine_indices_l_tuple_nu_minus_one = []
