@@ -4,8 +4,7 @@ import rascaline
 from .LE_initialization import initialize_basis
 from .LE_metadata import get_le_metadata
 from .generalized_cgs import get_generalized_cgs
-from .LE_iterator import LEIterator
-from .ACE_symmetrizer import ACESymmetrizer
+from .ACE_calculator import ACECalculator
 from equistore import Labels
 
 from .LE_expansion import get_LE_expansion
@@ -66,7 +65,8 @@ class LE_ACE(torch.nn.Module):
         for requested_L_sigma_pair in requested_L_sigma_pairs:
             necessary_l_tuples_nu_max.extend(list(self.generalized_cgs[requested_L_sigma_pair][nu_max].keys()))
 
-        # For correlation order nu, remove unncecessary indices that violate the parity constraints:
+        # For correlation order nu_max, remove unncecessary indices that violate the parity constraints, so that the corresponding A-basis is never calculated:
+        # FIXME: move somewhere else
         keys_to_pop = []
         for l_tuple_nu_max in self.combine_indices[nu_max].keys():
             if l_tuple_nu_max not in necessary_l_tuples_nu_max:
@@ -77,7 +77,10 @@ class LE_ACE(torch.nn.Module):
             self.multiplicities[nu_max].pop(l_tuple_nu_max)
             self.LE_energies[nu_max].pop(l_tuple_nu_max)
 
-        self.fixed_order_l_tuples = [0, 1] + [list(self.generalized_cgs[(0, 1)][nu].keys()) for nu in range(2, nu_max+1)]  # Needed to have consistent ordering when concatenating
+        # Needed to have consistent ordering when concatenating
+        self.fixed_order_l_tuples = [0, 1] + [list(self.generalized_cgs[(0, 1)][nu].keys()) for nu in range(2, nu_max+1)]  
+        # these, thanks to the ordering enforced in the metadata generation step, should only be the necessary generalized cgs
+        # and they will be ordered lexicographically for each nu
 
         # Build extended LE_energies according to L_tuple and a_i:
         self.extended_LE_energies = []
@@ -92,11 +95,16 @@ class LE_ACE(torch.nn.Module):
             else:
                 extended_LE_energies_nu = []
                 for l_tuple in self.fixed_order_l_tuples[nu]:
-                    extended_LE_energies_nu.append(self.LE_energies[nu][l_tuple])
+                    extended_LE_energies_nu.append(
+                        torch.tile(
+                            self.LE_energies[nu][l_tuple],
+                            (self.generalized_cgs[(0, 1)][nu][l_tuple].shape[0],)  # Account for different L
+                        )
+                    )
                 extended_LE_energies_nu = torch.concatenate(extended_LE_energies_nu)
                 extended_LE_energies_nu = torch.tile(
                     extended_LE_energies_nu,
-                    (self.n_species*self.generalized_cgs[(0, 1)][nu][l_tuple].shape[0],)  # Account for L (as well as a_i)
+                    (self.n_species,)  # Account for different a_i
                 )
             self.extended_LE_energies.append(extended_LE_energies_nu)
         print([tensor.shape[0] for tensor in self.extended_LE_energies])
@@ -104,8 +112,7 @@ class LE_ACE(torch.nn.Module):
         self.nu0_calculator_train = rascaline.AtomicComposition(per_structure=False)
         self.radial_spectrum_calculator_train = radial_spectrum_calculator
         self.spherical_expansion_calculator_train = spherical_expansion_calculator
-        self.le_iterator = LEIterator(self.combine_indices, self.multiplicities)
-        self.ace_symmetrizer = ACESymmetrizer(self.generalized_cgs)
+        self.ace_calculator = ACECalculator(l_max, self.combine_indices, self.multiplicities, self.generalized_cgs)
 
     def forward(self, structures):
         n_structures = len(structures)
@@ -131,10 +138,7 @@ class LE_ACE(torch.nn.Module):
         radial_spectrum = radial_spectrum_tmap.block(0).values.to(self.device)  # NEEDED DUE TO BUG
         spherical_expansion = {(l,): block.values.swapaxes(0, 2) for (l,), block in spherical_expansion_tmap.items()}
 
-        print("Calculating A basis")
-        A_basis = self.le_iterator(spherical_expansion)
-        print("Calculating B basis")
-        B_basis = self.ace_symmetrizer(A_basis)[(0, 1)]
+        B_basis = self.ace_calculator(spherical_expansion)[(0, 1)]
         
         # Concatenate different features at the same body_order:
         B_basis_concatenated = [composition_features, radial_spectrum]
@@ -216,10 +220,7 @@ class LE_ACE(torch.nn.Module):
             for (l,), block in spherical_expansion_tmap.items()
         }
 
-        print("Calculating A basis")
-        A_basis, A_basis_gradients = self.le_iterator.compute_with_gradients(spherical_expansion, spherical_expansion_grad, spex_grad_metadata[:, 0])
-        print("Calculating B basis")
-        B_basis, B_basis_gradients = self.ace_symmetrizer.compute_with_gradients(A_basis, A_basis_gradients)
+        B_basis, B_basis_gradients = self.ace_calculator.compute_with_gradients(spherical_expansion, spherical_expansion_grad, spex_grad_metadata[:, 0])
         B_basis = B_basis[(0, 1)]
         B_basis_grad = B_basis_gradients[(0, 1)]
         
