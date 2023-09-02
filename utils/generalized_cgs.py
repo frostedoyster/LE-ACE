@@ -55,7 +55,10 @@ def get_generalized_cgs(l_tuples, requested_L_sigma, nu_max, device):
             for l_tuple in generalized_cgs[L_sigma][nu].keys():
                 generalized_cg_matrices_l_tuple = list(generalized_cgs[L_sigma][nu][l_tuple].values())
                 generalized_cgs_compressed_L_sigma[nu][l_tuple] = torch.stack(generalized_cg_matrices_l_tuple, dim=1)
-                generalized_cgs_compressed_L_sigma[nu][l_tuple] = generalized_cgs_compressed_L_sigma[nu][l_tuple].reshape(-1, generalized_cgs_compressed_L_sigma[nu][l_tuple].shape[2]).to_sparse_csr()
+                if device == "cpu":
+                    generalized_cgs_compressed_L_sigma[nu][l_tuple] = generalized_cgs_compressed_L_sigma[nu][l_tuple].reshape(-1, generalized_cgs_compressed_L_sigma[nu][l_tuple].shape[2]).to_sparse_coo()
+                else:
+                    generalized_cgs_compressed_L_sigma[nu][l_tuple] = generalized_cgs_compressed_L_sigma[nu][l_tuple].reshape(-1, generalized_cgs_compressed_L_sigma[nu][l_tuple].shape[2]).to_sparse_csr()
 
     return generalized_cgs_compressed 
 
