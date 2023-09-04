@@ -35,6 +35,10 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     cost_trade_off = param_dict["cost_trade_off"]
     le_type = param_dict["le_type"]
     dataset_style = param_dict["dataset_style"]
+    if dataset_style == "MD":
+        fixed_stoichiometry = True
+    else:
+        fixed_stoichiometry = False
     inner_smoothing = param_dict["inner_smoothing"]
     is_trace = param_dict["is_trace"]
     n_trace = param_dict["n_trace"]
@@ -128,7 +132,9 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         factor=factor,
         factor2=factor2,
         cost_trade_off=cost_trade_off,
+        fixed_stoichiometry=fixed_stoichiometry,
         is_trace=is_trace,
+        n_trace=n_trace,
         device=device
     )
 
@@ -200,6 +206,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         for nu in range(nu_max+1):
             LE_reg[nu] *= np.exp(beta*nu)
         LE_reg = torch.concatenate(LE_reg)
+        assert LE_reg.shape[0] == symm.shape[0]
 
         for alpha in alpha_list-beta*1.5:
             #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)

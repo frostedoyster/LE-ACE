@@ -23,7 +23,9 @@ class LE_ACE(torch.nn.Module):
         factor,
         factor2,
         cost_trade_off,
+        fixed_stoichiometry,
         is_trace,
+        n_trace,
         device
     ):
         super().__init__()
@@ -32,12 +34,17 @@ class LE_ACE(torch.nn.Module):
         self.E_max = E_max
         self.nu_max = nu_max
         self.device = device
-        self.is_trace = is_trace
+        self.fixed_stoichiometry = fixed_stoichiometry
 
         self.all_species = all_species
         self.n_species = len(all_species)
         self.all_species_tensor = torch.tensor(all_species, dtype=torch.long, device=self.device)
         self.species_to_species_index = torch.zeros(max(all_species)+1, dtype=torch.long, device=self.device)
+        self.is_trace = is_trace
+        if self.is_trace:
+            self.n_trace = n_trace
+            self.trace_comb = torch.tensor(np.random.normal(size=(self.n_species, n_trace)))
+
         counter = 0
         for species in all_species:
             self.species_to_species_index[species] = counter
@@ -56,7 +63,7 @@ class LE_ACE(torch.nn.Module):
         print(n_max_l)
         E_ln = [E_ln[l][:n_max_l[l]] for l in range(l_max+1)]
 
-        self.combine_indices, self.multiplicities, self.LE_energies = get_le_metadata(all_species, E_max, n_max_l, E_ln, is_trace, device)
+        self.combine_indices, self.multiplicities, self.LE_energies = get_le_metadata(all_species, E_max, n_max_l, E_ln, is_trace, n_trace, device)
 
         l_tuples = [0, 1] + [list(self.combine_indices[nu].keys()) for nu in range(2, nu_max+1)]
         requested_L_sigma_pairs = [(0, 1)]
@@ -86,11 +93,16 @@ class LE_ACE(torch.nn.Module):
         self.extended_LE_energies = []
         for nu in range(self.nu_max+1):
             if nu == 0:
-                extended_LE_energies_nu = torch.tensor([0.0], dtype=torch.get_default_dtype(), device=self.device)
+                if fixed_stoichiometry:
+                    lst = [0.0]
+                else:
+                    lst = [0.0]*self.n_species
+                extended_LE_energies_nu = torch.tensor(lst, dtype=torch.get_default_dtype(), device=self.device)
             elif nu == 1:
+                n_repeat = (self.n_species*self.n_trace if self.is_trace else self.n_species**2)
                 extended_LE_energies_nu = torch.tile(
                     torch.tensor(self.E_n0[:self.n_max_rs], dtype=torch.get_default_dtype(), device=self.device),
-                    (self.n_species**2,)
+                    (n_repeat,)
                 )
             else:
                 extended_LE_energies_nu = []
@@ -121,8 +133,8 @@ class LE_ACE(torch.nn.Module):
         composition_features_tmap = composition_features_tmap.keys_to_samples("species_center")
 
         if self.is_trace:
-            radial_spectrum_tmap = get_TRACE_expansion(structures, radial_spectrum_calculator_train, self.E_n0, E_max[1], all_species, trace_comb, rs=True, device=self.device)
-            spherical_expansion_tmap = get_TRACE_expansion(structures, spherical_expansion_calculator_train, E_nl, E_max[2], all_species, trace_comb, device=self.device)
+            radial_spectrum_tmap = get_TRACE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, self.trace_comb, rs=True, device=self.device)
+            spherical_expansion_tmap = get_TRACE_expansion(structures, self.spherical_expansion_calculator_train, self.E_nl, self.E_max[2], self.all_species, self.trace_comb, device=self.device)
         else:
             radial_spectrum_tmap = get_LE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, rs=True, device=self.device)
             spherical_expansion_tmap = get_LE_expansion(structures, self.spherical_expansion_calculator_train, self.E_nl, self.E_max[2], self.all_species, device=self.device)
@@ -159,7 +171,9 @@ class LE_ACE(torch.nn.Module):
                 B_basis_per_structure_nu = torch.zeros(
                     n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
                 ).index_add_(0, sum_indices_comp, B_basis_concatenated[nu])
-                B_basis_per_structure_nu = B_basis_per_structure_nu.reshape(n_structures, -1).sum(dim=1)
+                B_basis_per_structure_nu = B_basis_per_structure_nu.reshape(n_structures, -1)
+                if self.fixed_stoichiometry:
+                    B_basis_per_structure_nu = B_basis_per_structure_nu.sum(dim=1)
             elif nu == 1:
                 B_basis_per_structure_nu = torch.zeros(
                     n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
@@ -248,7 +262,10 @@ class LE_ACE(torch.nn.Module):
                 B_basis_per_structure_nu = torch.zeros(
                     n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
                 ).index_add_(0, sum_indices_comp, B_basis_concatenated[nu])
-                B_basis_per_structure_nu = B_basis_per_structure_nu.reshape(n_structures, -1).sum(dim=1)
+                B_basis_per_structure_nu = B_basis_per_structure_nu.reshape(n_structures, -1)
+                if self.fixed_stoichiometry:
+                    # Sum contributions from all atoms
+                    B_basis_per_structure_nu = B_basis_per_structure_nu.sum(dim=1)
             elif nu == 1:
                 B_basis_per_structure_nu = torch.zeros(
                     n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
@@ -284,7 +301,8 @@ class LE_ACE(torch.nn.Module):
                 ).index_add_(0, sum_indices_spex_grad, B_basis_concatenated_grad[nu])
             
             B_basis_per_structure_nu_grad = B_basis_per_structure_nu_grad.reshape(n_force_centers, self.n_species, 3, -1).swapaxes(1, 2).reshape(n_force_centers, 3, -1)
-            if nu == 0: B_basis_per_structure_nu_grad = B_basis_per_structure_nu_grad.sum(dim=2, keepdim=True)
+            if nu == 0 and self.fixed_stoichiometry:
+                B_basis_per_structure_nu_grad = B_basis_per_structure_nu_grad.sum(dim=2, keepdim=True)
             B_basis_per_structure_grad.append(B_basis_per_structure_nu_grad)
         
         # Concatenate different body-orders:

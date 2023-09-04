@@ -137,7 +137,7 @@ def get_TRACE_expansion(structures, calculator, E_nl, E_max, all_species, contra
     n_elems = len(all_species)
 
     new_blocks = []
-    for key, block in spherical_expansion_coefficients:
+    for key, block in spherical_expansion_coefficients.items():
 
         new_values = (
             block.values.reshape(
