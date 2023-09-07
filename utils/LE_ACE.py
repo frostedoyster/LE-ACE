@@ -43,7 +43,7 @@ class LE_ACE(torch.nn.Module):
         self.is_trace = is_trace
         if self.is_trace:
             self.n_trace = n_trace
-            self.trace_comb = torch.tensor(np.random.normal(size=(self.n_species, n_trace)))
+            self.trace_comb = torch.tensor(np.random.normal(size=(self.n_species, n_trace)), device=device)
 
         counter = 0
         for species in all_species:
@@ -143,11 +143,11 @@ class LE_ACE(torch.nn.Module):
         radial_spectrum_tmap = radial_spectrum_tmap.keys_to_samples("a_i")
         spherical_expansion_tmap = spherical_expansion_tmap.keys_to_samples("a_i")
 
-        comp_metadata = torch.tensor(composition_features_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
-        rs_metadata = torch.tensor(radial_spectrum_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
-        spex_metadata = torch.tensor(spherical_expansion_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
+        comp_metadata = composition_features_tmap.block(0).samples.values.to(self.device)
+        rs_metadata = radial_spectrum_tmap.block(0).samples.values.to(self.device)
+        spex_metadata = spherical_expansion_tmap.block(0).samples.values.to(self.device)
 
-        composition_features = torch.tensor(composition_features_tmap.block(0).values, dtype=torch.get_default_dtype(), device=self.device)
+        composition_features = composition_features_tmap.block(0).values.to(self.device)
         radial_spectrum = radial_spectrum_tmap.block(0).values.to(self.device)  # NEEDED DUE TO BUG
         spherical_expansion = {(l,): block.values.swapaxes(0, 2) for (l,), block in spherical_expansion_tmap.items()}
 
@@ -204,28 +204,28 @@ class LE_ACE(torch.nn.Module):
         composition_features_tmap = composition_features_tmap.keys_to_samples("species_center")
 
         if self.is_trace:
-            radial_spectrum_tmap = get_TRACE_expansion(structures, radial_spectrum_calculator_train, self.E_n0, E_max[1], all_species, trace_comb, rs=True, do_gradients=True)
-            spherical_expansion_tmap = get_TRACE_expansion(structures, spherical_expansion_calculator_train, E_nl, E_max[2], all_species, trace_comb, do_gradients=True, device=self.device)
+            radial_spectrum_tmap = get_TRACE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, self.trace_comb, rs=True, do_gradients=True, device=self.device)
+            spherical_expansion_tmap = get_TRACE_expansion(structures, self.spherical_expansion_calculator_train, self.E_nl, self.E_max[2], self.all_species, self.trace_comb, do_gradients=True, device=self.device)
         else:
-            radial_spectrum_tmap = get_LE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, rs=True, do_gradients=True)
+            radial_spectrum_tmap = get_LE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, rs=True, do_gradients=True, device=self.device)
             spherical_expansion_tmap = get_LE_expansion(structures, self.spherical_expansion_calculator_train, self.E_nl, self.E_max[2], self.all_species, do_gradients=True, device=self.device)
 
         radial_spectrum_tmap = radial_spectrum_tmap.keys_to_samples("a_i")
         spherical_expansion_tmap = spherical_expansion_tmap.keys_to_samples("a_i")
 
-        comp_metadata = composition_features_tmap.block(0).samples.values
-        rs_metadata = radial_spectrum_tmap.block(0).samples.values
-        spex_metadata = spherical_expansion_tmap.block(0).samples.values
+        comp_metadata = composition_features_tmap.block(0).samples.values.to(self.device)
+        rs_metadata = radial_spectrum_tmap.block(0).samples.values.to(self.device)
+        spex_metadata = spherical_expansion_tmap.block(0).samples.values.to(self.device)
 
-        composition_features = composition_features_tmap.block(0).values
+        composition_features = composition_features_tmap.block(0).values.to(self.device)
         radial_spectrum = radial_spectrum_tmap.block(0).values.to(self.device)  # DUE TO BUG
         spherical_expansion = {(l,): block.values.swapaxes(0, 2) for (l,), block in spherical_expansion_tmap.items()}
 
-        comp_grad_metadata = composition_features_tmap.block(0).gradient("positions").samples.values
-        rs_grad_metadata = radial_spectrum_tmap.block(0).gradient("positions").samples.values
-        spex_grad_metadata = spherical_expansion_tmap.block(0).gradient("positions").samples.values
+        comp_grad_metadata = composition_features_tmap.block(0).gradient("positions").samples.values.to(self.device)
+        rs_grad_metadata = radial_spectrum_tmap.block(0).gradient("positions").samples.values.to(self.device)
+        spex_grad_metadata = spherical_expansion_tmap.block(0).gradient("positions").samples.values.to(self.device)
 
-        composition_features_grad = composition_features_tmap.block(0).gradient("positions").values
+        composition_features_grad = composition_features_tmap.block(0).gradient("positions").values.to(self.device)
         radial_spectrum_grad = radial_spectrum_tmap.block(0).gradient("positions").values.to(self.device)  # DUE TO BUG
         spherical_expansion_grad = {
             (l,): block.gradient("positions").values.reshape(-1, block.gradient("positions").values.shape[2], block.gradient("positions").values.shape[3]).swapaxes(0, 2).reshape(

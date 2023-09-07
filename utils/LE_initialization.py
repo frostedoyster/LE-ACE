@@ -1,5 +1,6 @@
 import numpy as np
 
+import rascaline
 import rascaline.torch
 from metatensor.torch import Labels
 
@@ -104,7 +105,7 @@ def initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off=False):
         derivative_last = (function_for_splining(n, l, np.array([a])) - function_for_splining(n, l, np.array([a-delta/10.0]))) / (delta/10.0)
         return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
 
-    spline_points = rascaline.torch.generate_splines(
+    spline_points = rascaline.generate_splines(
         function_for_splining,
         function_for_splining_derivative,
         n_max,

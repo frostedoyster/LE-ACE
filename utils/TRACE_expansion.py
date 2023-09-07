@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 
 from metatensor.torch import TensorMap, Labels, TensorBlock
@@ -25,9 +24,9 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
         labels_TRACE = [] 
         for n in block.properties["n"]:
             if E_nl[n, l] <= E_max: 
-                TRACE_values[:, :, counter_TRACE] = torch.tensor(block.values[:, :, counter_total])
-                if do_gradients: TRACE_gradients[:, :, :, counter_TRACE] = torch.tensor(block.gradient("positions").values[:, :, :, counter_total])
-                labels_TRACE.append([species_remapping[block.properties["species_neighbor"][counter_total]], n, l, l])
+                TRACE_values[:, :, counter_TRACE] = block.values[:, :, counter_total]
+                if do_gradients: TRACE_gradients[:, :, :, counter_TRACE] = block.gradient("positions").values[:, :, :, counter_total]
+                labels_TRACE.append([species_remapping[int(block.properties["species_neighbor"][counter_total])], n, l, l])
                 counter_TRACE += 1
             counter_total += 1
         TRACE_block = TensorBlock(
@@ -36,7 +35,7 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
             components=block.components,
             properties=Labels(
                 names = ("a1", "n1", "l1", "k1"),
-                values = np.array(labels_TRACE),
+                values = torch.tensor(labels_TRACE, device=device),
             ),
         )
         if do_gradients: TRACE_block.add_gradient(
@@ -58,8 +57,8 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
         )
 
 
-def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMap:
-    # TODO: This could really be simplified: no TRACE-like cutting should be necessary
+def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species, device) -> TensorMap:
+    # TODO: This could really be simplified: no LE-like cutting should be necessary
 
     do_gradients = map.block(0).has_gradient("positions")
 
@@ -69,7 +68,7 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMa
 
     TRACE_blocks = []
     for species_center in all_species:  # TODO: do not rely on all_species, which is used for the neighbors but some may be missing from the centers
-        block = map.block(species_center=species_center)
+        block = map.block({"species_center": species_center})
         l = 0
         counter = 0
         for n in block.properties["n"]:
@@ -81,24 +80,24 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMa
         labels_TRACE = [] 
         for n in block.properties["n"]:
             if E_n[n] <= E_max: 
-                TRACE_values[:, counter_TRACE] = torch.tensor(block.values[:, counter_total])
-                if do_gradients: TRACE_gradients[:, :, counter_TRACE] = torch.tensor(block.gradient("positions").values[:, :, counter_total])
-                labels_TRACE.append([species_remapping[block.properties["species_neighbor"][counter_total]], n, l, l])
+                TRACE_values[:, counter_TRACE] = block.values[:, counter_total]
+                if do_gradients: TRACE_gradients[:, :, counter_TRACE] = block.gradient("positions").values[:, :, counter_total]
+                labels_TRACE.append([species_remapping[int(block.properties["species_neighbor"][counter_total])], n, l, l])
                 counter_TRACE += 1
             counter_total += 1
         TRACE_block = TensorBlock(
-            values=TRACE_values,
+            values=TRACE_values.to(device),
             samples=block.samples,
             components=block.components,
             properties=Labels(
                 names = ("a1", "n1", "l1", "k1"),
-                values = np.array(labels_TRACE),
+                values = torch.tensor(labels_TRACE, device=device),
             ),
         )
         if do_gradients: TRACE_block.add_gradient(
             parameter="positions",
             gradient=TensorBlock(
-                values = TRACE_gradients, 
+                values = TRACE_gradients.to(device), 
                 samples = block.gradient("positions").samples, 
                 components = block.gradient("positions").components,
                 properties = TRACE_block.properties,
@@ -124,13 +123,13 @@ def get_TRACE_expansion(structures, calculator, E_nl, E_max, all_species, contra
 
     all_neighbor_species = Labels(
             names=["species_neighbor"],
-            values=np.array(all_species, dtype=np.int32).reshape(-1, 1),
+            values=torch.tensor(all_species, device=device).reshape(-1, 1),
         )
         
     spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
 
     if rs:
-        spherical_expansion_coefficients = process_radial_spectrum(spherical_expansion_coefficients, E_nl, E_max, all_species)
+        spherical_expansion_coefficients = process_radial_spectrum(spherical_expansion_coefficients, E_nl, E_max, all_species, device=device)
     else:
         spherical_expansion_coefficients = process_spherical_expansion(spherical_expansion_coefficients, E_nl, E_max, all_species, device=device)
 
@@ -144,9 +143,9 @@ def get_TRACE_expansion(structures, calculator, E_nl, E_max, all_species, contra
                 block.values.shape[:-1] + (n_elems, -1)
         ).swapaxes(-2, -1) @ contraction_matrix).swapaxes(-2, -1).reshape(block.values.shape[:-1] +(-1,))
 
-        new_properties_values = np.array([
+        new_properties_values = torch.tensor([
             [z, block.properties[nl_index][1], block.properties[nl_index][2], block.properties[nl_index][3]] for z in range(n_trace) for nl_index in range(len(block.properties)//n_elems)
-        ], dtype = np.int32)
+        ], device=device)
 
         new_properties = Labels(
             names = ["z", "n1", "l1", "k1"],
