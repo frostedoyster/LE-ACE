@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from metatensor import TensorMap, Labels, TensorBlock
+from metatensor.torch import TensorMap, Labels, TensorBlock
 
 
 def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device) -> TensorMap:

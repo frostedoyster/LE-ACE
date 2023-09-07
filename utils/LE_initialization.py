@@ -1,7 +1,7 @@
 import numpy as np
 
-import rascaline
-from metatensor import Labels
+import rascaline.torch
+from metatensor.torch import Labels
 
 import scipy as sp
 from scipy import optimize
@@ -104,7 +104,7 @@ def initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off=False):
         derivative_last = (function_for_splining(n, l, np.array([a])) - function_for_splining(n, l, np.array([a-delta/10.0]))) / (delta/10.0)
         return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
 
-    spline_points = rascaline.generate_splines(
+    spline_points = rascaline.torch.generate_splines(
         function_for_splining,
         function_for_splining_derivative,
         n_max,
@@ -141,9 +141,9 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
 
     if l_max == 0:
         hypers_spherical_expansion.pop("max_angular")
-        calculator = rascaline.SoapRadialSpectrum(**hypers_spherical_expansion)
+        calculator = rascaline.torch.SoapRadialSpectrum(**hypers_spherical_expansion)
     else:
-        calculator = rascaline.SphericalExpansion(**hypers_spherical_expansion)
+        calculator = rascaline.torch.SphericalExpansion(**hypers_spherical_expansion)
 
 
     # Uncomment this to inspect the spherical expansion
@@ -159,7 +159,7 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
                 )
             return dummy_structures 
 
-        # Create a fake list of dummy structures to test the radial functions generated from rascaline.
+        # Create a fake list of dummy structures to test the radial functions generated from rascaline.torch.
 
         r = np.linspace(0.1, a-0.001, 1000)
         structures = get_dummy_structures(r)
@@ -180,7 +180,7 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
         spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
 
         import matplotlib.pyplot as plt
-        plt.plot(r, block_C_0_0/spherical_harmonics_0, label="rascaline output")
+        plt.plot(r, block_C_0_0/spherical_harmonics_0, label="rascaline.torch output")
         plt.plot([0.0, a], [0.0, 0.0], "black")
         plt.xlim(0.0, a)
         plt.legend()

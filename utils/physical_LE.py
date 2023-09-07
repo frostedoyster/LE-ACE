@@ -3,6 +3,7 @@ import scipy as sp
 import matplotlib.pyplot as plt
 
 import rascaline
+import rascaline.torch
 import multiprocessing
 
 from scipy.special import spherical_jn as j_l

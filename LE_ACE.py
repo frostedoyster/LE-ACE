@@ -1,13 +1,14 @@
 import math
 import numpy as np
 import torch
-import metatensor
+import metatensor.torch
 from datetime import datetime
 import ase
 from ase import io
 
 from utils.dataset_processing import get_dataset_slices, get_minimum_distance
 from utils.error_measures import get_rmse, get_mae
+import rascaline.torch
 
 import json
 

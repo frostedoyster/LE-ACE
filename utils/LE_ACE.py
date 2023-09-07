@@ -1,11 +1,11 @@
 import numpy as np
 import torch
-import rascaline
+import rascaline.torch
 from .LE_initialization import initialize_basis
 from .LE_metadata import get_le_metadata
 from .generalized_cgs import get_generalized_cgs
 from .ACE_calculator import ACECalculator
-from metatensor import Labels
+from metatensor.torch import Labels
 
 from .LE_expansion import get_LE_expansion
 from .TRACE_expansion import get_TRACE_expansion
@@ -36,7 +36,7 @@ class LE_ACE(torch.nn.Module):
         self.device = device
         self.fixed_stoichiometry = fixed_stoichiometry
 
-        self.all_species = all_species
+        self.all_species = [int(species) for species in all_species]
         self.n_species = len(all_species)
         self.all_species_tensor = torch.tensor(all_species, dtype=torch.long, device=self.device)
         self.species_to_species_index = torch.zeros(max(all_species)+1, dtype=torch.long, device=self.device)
@@ -121,13 +121,14 @@ class LE_ACE(torch.nn.Module):
             self.extended_LE_energies.append(extended_LE_energies_nu)
         print([tensor.shape[0] for tensor in self.extended_LE_energies])
 
-        self.nu0_calculator_train = rascaline.AtomicComposition(per_structure=False)
+        self.nu0_calculator_train = rascaline.torch.AtomicComposition(per_structure=False)
         self.radial_spectrum_calculator_train = radial_spectrum_calculator
         self.spherical_expansion_calculator_train = spherical_expansion_calculator
         self.ace_calculator = ACECalculator(l_max, self.combine_indices, self.multiplicities, self.generalized_cgs)
 
     def compute_features(self, structures):
         n_structures = len(structures)
+        structures = rascaline.torch.systems_to_torch(structures)
 
         composition_features_tmap = self.nu0_calculator_train.compute(structures)
         composition_features_tmap = composition_features_tmap.keys_to_samples("species_center")
@@ -195,6 +196,8 @@ class LE_ACE(torch.nn.Module):
     def compute_features_with_gradients(self, structures):
 
         n_structures = len(structures)
+        structures = rascaline.torch.systems_to_torch(structures)
+
         gradients = ["positions"]
 
         composition_features_tmap = self.nu0_calculator_train.compute(structures, gradients=gradients)
@@ -210,19 +213,19 @@ class LE_ACE(torch.nn.Module):
         radial_spectrum_tmap = radial_spectrum_tmap.keys_to_samples("a_i")
         spherical_expansion_tmap = spherical_expansion_tmap.keys_to_samples("a_i")
 
-        comp_metadata = torch.tensor(composition_features_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
-        rs_metadata = torch.tensor(radial_spectrum_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
-        spex_metadata = torch.tensor(spherical_expansion_tmap.block(0).samples.values, dtype=torch.long, device=self.device)
+        comp_metadata = composition_features_tmap.block(0).samples.values
+        rs_metadata = radial_spectrum_tmap.block(0).samples.values
+        spex_metadata = spherical_expansion_tmap.block(0).samples.values
 
-        composition_features = torch.tensor(composition_features_tmap.block(0).values, dtype=torch.get_default_dtype(), device=self.device)
+        composition_features = composition_features_tmap.block(0).values
         radial_spectrum = radial_spectrum_tmap.block(0).values.to(self.device)  # DUE TO BUG
         spherical_expansion = {(l,): block.values.swapaxes(0, 2) for (l,), block in spherical_expansion_tmap.items()}
 
-        comp_grad_metadata = torch.tensor(composition_features_tmap.block(0).gradient("positions").samples.values, dtype=torch.long, device=self.device)
-        rs_grad_metadata = torch.tensor(radial_spectrum_tmap.block(0).gradient("positions").samples.values, dtype=torch.long, device=self.device)
-        spex_grad_metadata = torch.tensor(spherical_expansion_tmap.block(0).gradient("positions").samples.values, dtype=torch.long, device=self.device)
+        comp_grad_metadata = composition_features_tmap.block(0).gradient("positions").samples.values
+        rs_grad_metadata = radial_spectrum_tmap.block(0).gradient("positions").samples.values
+        spex_grad_metadata = spherical_expansion_tmap.block(0).gradient("positions").samples.values
 
-        composition_features_grad = torch.tensor(composition_features_tmap.block(0).gradient("positions").values, dtype=torch.get_default_dtype(), device=self.device)
+        composition_features_grad = composition_features_tmap.block(0).gradient("positions").values
         radial_spectrum_grad = radial_spectrum_tmap.block(0).gradient("positions").values.to(self.device)  # DUE TO BUG
         spherical_expansion_grad = {
             (l,): block.gradient("positions").values.reshape(-1, block.gradient("positions").values.shape[2], block.gradient("positions").values.shape[3]).swapaxes(0, 2).reshape(
