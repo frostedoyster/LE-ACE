@@ -1,7 +1,7 @@
 import numpy as np
 
 import rascaline
-from equistore import Labels
+from metatensor import Labels
 
 import scipy as sp
 from scipy import optimize

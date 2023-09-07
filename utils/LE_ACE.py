@@ -5,7 +5,7 @@ from .LE_initialization import initialize_basis
 from .LE_metadata import get_le_metadata
 from .generalized_cgs import get_generalized_cgs
 from .ACE_calculator import ACECalculator
-from equistore import Labels
+from metatensor import Labels
 
 from .LE_expansion import get_LE_expansion
 from .TRACE_expansion import get_TRACE_expansion
@@ -126,7 +126,7 @@ class LE_ACE(torch.nn.Module):
         self.spherical_expansion_calculator_train = spherical_expansion_calculator
         self.ace_calculator = ACECalculator(l_max, self.combine_indices, self.multiplicities, self.generalized_cgs)
 
-    def forward(self, structures):
+    def compute_features(self, structures):
         n_structures = len(structures)
 
         composition_features_tmap = self.nu0_calculator_train.compute(structures)
@@ -192,7 +192,7 @@ class LE_ACE(torch.nn.Module):
 
         return B_basis_all_together
 
-    def compute_with_gradients(self, structures):
+    def compute_features_with_gradients(self, structures):
 
         n_structures = len(structures)
         gradients = ["positions"]
@@ -311,6 +311,21 @@ class LE_ACE(torch.nn.Module):
         print("Number of features per body-order:", [B_basis_per_structure[nu].shape[1] for nu in range(0, self.nu_max+1)])
 
         return B_basis_all_together, B_basis_all_together_grad
+
+
+    def forward():
+        # Allows training with backpropagation
+        raise NotImplementedError()
+
+
+    def to_predict():
+
+        # Prepare the LE_ACE_predict class
+        raise NotImplementedError()
+
+        return le_ace_predict
+
+
 
 
 if __name__ == "__main__":

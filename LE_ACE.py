@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import torch
-import equistore
+import metatensor
 from datetime import datetime
 import ase
 from ase import io
@@ -143,12 +143,12 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     for i_batch, batch in enumerate(train_structures):
         print(f"DOING TRAIN BATCH {i_batch+1} out of {len(train_structures)}")
         if do_gradients:
-            values, gradients = le_ace.compute_with_gradients(batch)
+            values, gradients = le_ace.compute_features_with_gradients(batch)
             gradients = -FORCE_WEIGHT*gradients.reshape(gradients.shape[0]*3, values.shape[1])
             X_train_batches.append(values)
             X_train_batches_grad.append(gradients)
         else:
-            values = le_ace(batch)
+            values = le_ace.compute_features(batch)
             X_train_batches.append(values)
 
     if do_gradients:
@@ -161,12 +161,12 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     for i_batch, batch in enumerate(test_structures):
         print(f"DOING TEST BATCH {i_batch+1} out of {len(test_structures)}")
         if do_gradients:
-            values, gradients = le_ace.compute_with_gradients(batch)
+            values, gradients = le_ace.compute_features_with_gradients(batch)
             gradients = -FORCE_WEIGHT*gradients.reshape(gradients.shape[0]*3, values.shape[1])
             X_test_batches.append(values)
             X_test_batches_grad.append(gradients)
         else:
-            values = le_ace(batch)
+            values = le_ace.compute_features(batch)
             X_test_batches.append(values)
 
     if do_gradients:
