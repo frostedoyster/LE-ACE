@@ -9,6 +9,7 @@ from metatensor.torch import Labels
 
 from .LE_expansion import get_LE_expansion
 from .TRACE_expansion import get_TRACE_expansion
+from .error_measures import get_rmse, get_mae
 
 
 class LE_ACE(torch.nn.Module):
@@ -329,50 +330,212 @@ class LE_ACE(torch.nn.Module):
         return le_ace_predict
 
 
+    def train(self, train_structures, validation_structures=None, test_structures=None, training_style="linear algebra", backend="rascaline", target_key="energy", batch_size=None, do_gradients=False, force_weight=0.03, opt_target_name="rmse"):
 
+        n_train = len(train_structures)
 
-if __name__ == "__main__":
-    torch.set_default_dtype(torch.float64)
-    np.random.seed(2)
-    dictionary = {
-        "r_cut_rs": 6.0,
-        "r_cut": 6.0,
-        "E_max": [1e+30, 1000.0, 25.0],
-        "all_species": [1, 6],
-        "le_type": "pure",
-        "factor": 1.0,
-        "factor2": 0.6,
-        "cost_trade_off": False,
-        "device": "cpu",
-        "is_trace": False,
-    }
-    le_ace = LE_ACE(**dictionary)
+        if validation_structures is None:
+            np.random.shuffle(train_structures)
+            n_validation = n_train // 10
+            n_train = n_train - n_validation
+            validation_structures = train_structures[:n_validation]
+            train_structures = train_structures[n_validation:]
+        else:
+            n_validation = len(validation_structures)
 
-    DATASET_PATH = "datasets/rmd17/benzene1.extxyz"
-    train_slice = "5:10"
-    test_slice = "1000:1005"
+        if test_structures is not None: n_test = len(test_structures)
 
-    import ase
-    from ase import io
+        if batch_size is None:
+            batch_size = 10 if do_gradients else 100
 
-    train_structures = ase.io.read(DATASET_PATH, train_slice)
-    test_structures = ase.io.read(DATASET_PATH, test_slice)
+        train_energies = torch.tensor([structure.info[target_key] for structure in train_structures], dtype=torch.get_default_dtype(), device=self.device)
+        validation_energies = torch.tensor([structure.info[target_key] for structure in validation_structures], dtype=torch.get_default_dtype(), device=self.device)
+        if test_structures is not None: 
+            test_energies = torch.tensor([structure.info[target_key] for structure in test_structures], dtype=torch.get_default_dtype(), device=self.device)
 
-    train_values, train_gradients = le_ace.compute_with_gradients(train_structures)
+        if do_gradients:
+            train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)*force_weight
+            validation_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in validation_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)*force_weight
+            if test_structures is not None:
+                test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)*force_weight
 
-    delta = 1e-5
-    structure_counter = 0
-    counter = 0
-    for structure in train_structures:
-        for i_atom in range(structure.positions.shape[0]):
-            for alpha in range(3):
-                train_structures[structure_counter].positions[i_atom, alpha] += delta
-                train_values_plus = le_ace(train_structures)
-                train_structures[structure_counter].positions[i_atom, alpha] -= 2.0*delta
-                train_values_minus = le_ace(train_structures)
-                train_structures[structure_counter].positions[i_atom, alpha] += delta
-                numerical_derivative = (train_values_plus[structure_counter] - train_values_minus[structure_counter])/(2.0*delta)
-                # print(numerical_derivative-train_gradients[counter][alpha])
-                assert torch.allclose(numerical_derivative, train_gradients[counter][alpha])
-            counter += 1
-        structure_counter += 1
+        # Divide training and test set into batches (to limit memory usage):
+        def get_batches(list: list, batch_size: int) -> list:
+            batches = []
+            n_full_batches = len(list)//batch_size
+            for i_batch in range(n_full_batches):
+                batches.append(list[i_batch*batch_size:(i_batch+1)*batch_size])
+            if len(list) % batch_size != 0:
+                batches.append(list[n_full_batches*batch_size:])
+            return batches
+
+        train_structures = get_batches(train_structures, batch_size)
+        validation_structures = get_batches(validation_structures, batch_size)
+        if test_structures is not None: validation_structures = get_batches(test_structures, batch_size)
+
+        X_train_batches = []
+        X_train_batches_grad = []
+        for i_batch, batch in enumerate(train_structures):
+            print(f"DOING TRAIN BATCH {i_batch+1} out of {len(train_structures)}")
+            if do_gradients:
+                values, gradients = self.compute_features_with_gradients(batch)
+                gradients = -force_weight*gradients.reshape(gradients.shape[0]*3, values.shape[1])
+                X_train_batches.append(values)
+                X_train_batches_grad.append(gradients)
+            else:
+                values = self.compute_features(batch)
+                X_train_batches.append(values)
+
+        if do_gradients:
+            X_train = torch.concat(X_train_batches + X_train_batches_grad, dim = 0)
+        else:
+            X_train = torch.concat(X_train_batches, dim = 0)
+
+        X_validation_batches = []
+        X_validation_batches_grad = []
+        for i_batch, batch in enumerate(validation_structures):
+            print(f"DOING VALIDATION BATCH {i_batch+1} out of {len(validation_structures)}")
+            if do_gradients:
+                values, gradients = self.compute_features_with_gradients(batch)
+                gradients = -force_weight*gradients.reshape(gradients.shape[0]*3, values.shape[1])
+                X_validation_batches.append(values)
+                X_validation_batches_grad.append(gradients)
+            else:
+                values = self.compute_features(batch)
+                X_validation_batches.append(values)
+
+        if do_gradients:
+            X_validation = torch.concat(X_validation_batches + X_validation_batches_grad, dim = 0)
+        else:
+            X_validation = torch.concat(X_validation_batches, dim = 0)
+
+        if test_structures is not None:
+            X_test_batches = []
+            X_test_batches_grad = []
+            for i_batch, batch in enumerate(test_structures):
+                print(f"DOING TEST BATCH {i_batch+1} out of {len(test_structures)}")
+                if do_gradients:
+                    values, gradients = self.compute_features_with_gradients(batch)
+                    gradients = -force_weight*gradients.reshape(gradients.shape[0]*3, values.shape[1])
+                    X_test_batches.append(values)
+                    X_test_batches_grad.append(gradients)
+                else:
+                    values = self.compute_features(batch)
+                    X_test_batches.append(values)
+
+            if do_gradients:
+                X_test = torch.concat(X_test_batches + X_test_batches_grad, dim = 0)
+            else:
+                X_test = torch.concat(X_test_batches, dim = 0)
+
+        print("Features done")
+
+        print("Beginning hyperparameter optimization")
+
+        if do_gradients:
+            train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
+            validation_targets = torch.concat([validation_energies, validation_forces.reshape((-1,))])
+            if test_structures is not None: test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
+        else:
+            train_targets = train_energies
+            validation_targets = validation_energies
+            if test_structures is not None:
+                test_targets = test_energies
+
+        symm = X_train.T @ X_train
+        vec = X_train.T @ train_targets
+        alpha_list = np.linspace(-12.5, -2.5, 21)
+
+        # alpha_list = np.linspace(-10.0, 10.0, 41)
+        n_feat = X_train.shape[1]
+        print("Number of features: ", n_feat)
+
+        # from torch_mkl64 import mkl64
+        # from scipy.sparse.linalg import cg
+
+        best_opt_target = 1e30
+        for beta in [-2.0, -1.0, 0.0, 1.0, 2.0]:
+            print("beta=", beta)
+
+            LE_reg = [tensor.clone() for tensor in self.extended_LE_energies]
+            for nu in range(self.nu_max+1):
+                LE_reg[nu] *= np.exp(beta*nu)
+            LE_reg = torch.concatenate(LE_reg)
+            assert LE_reg.shape[0] == symm.shape[0]
+
+            for alpha in alpha_list-beta*1.5:
+                #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
+                for i in range(n_feat):
+                    symm[i, i] += 10**alpha*LE_reg[i]
+
+                try:
+                    # c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
+                    #print(symm)
+                    #print(vec)
+                    c = torch.linalg.solve(symm, vec)
+                    # c, info = cg(symm.numpy(force=True), vec.numpy(force=True), atol=1e-10, tol=1e-12)
+                    # c = torch.tensor(c)
+                    """if info != 0:
+                        print(info)
+                        opt_target.append(1e30)
+                        for i in range(n_feat):
+                            symm[i, i] -= 10.0**alpha*LE_reg[i]
+                        continue"""
+                    # c = mkl64.dposv(symm, vec)
+                except Exception as e:
+                    print(e)
+                    opt_target = 1e30
+                    for i in range(n_feat):
+                        symm[i, i] -= 10.0**alpha*LE_reg[i]
+                    continue
+                train_predictions = X_train @ c
+                validation_predictions = X_validation @ c
+                # print("Residual:", torch.sqrt(torch.sum((vec-symm@c)**2)))
+
+                print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item(), get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/force_weight, get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight, get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight)
+                if opt_target_name == "mae":
+                    if do_gradients:
+                        opt_target = get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight
+                    else:
+                        opt_target = get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item()
+                else:
+                    if do_gradients:
+                        opt_target = get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight
+                    else:    
+                        opt_target = get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item()
+
+                if opt_target < best_opt_target:
+                    best_opt_target = opt_target
+                    best_alpha = alpha
+                    best_beta = beta
+
+                for i in range(n_feat):
+                    symm[i, i] -= 10.0**alpha*LE_reg[i]
+
+        print("Best parameters:", best_alpha, best_beta)
+        if best_beta == -2.0 or best_beta == 2.0:
+            print("WARNING: hit grid search boundary")
+
+        LE_reg = [tensor.clone() for tensor in self.extended_LE_energies]
+        for nu in range(self.nu_max+1):
+            LE_reg[nu] *= np.exp(best_beta*nu)
+        LE_reg = torch.concatenate(LE_reg)  
+
+        for i in range(n_feat):
+            symm[i, i] += 10**best_alpha*LE_reg[i]
+        c = torch.linalg.solve(symm, vec)
+
+        validation_predictions = X_validation @ c
+        print("n_train:", n_train, "n_features:", n_feat)
+        print(f"Validation set RMSE (E): {get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item()} [MAE (E): {get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item()}], RMSE (F): {get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight} [MAE (F): {get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight}]")
+
+        if test_structures is not None:
+            validation_predictions = X_validation @ c
+            print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/force_weight} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/force_weight}]")
+
+        return {
+            "validation RMSE energies": get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item(),
+            "validation MAE energies": get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item(),
+            "validation RMSE forces": get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight if do_gradients else None,
+            "validation MAE forces": get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight if do_gradients else None,
+        }
