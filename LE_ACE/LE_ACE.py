@@ -5,11 +5,12 @@ from .LE_initialization import initialize_basis
 from .LE_metadata import get_le_metadata
 from .generalized_cgs import get_generalized_cgs
 from .ACE_calculator import ACECalculator
+from .solver import Solver
 from metatensor.torch import Labels
 
 from .LE_expansion import get_LE_expansion
 from .TRACE_expansion import get_TRACE_expansion
-from .error_measures import get_rmse, get_mae
+from .error_measures import get_rmse, get_mae, get_sae, get_sse
 
 
 class LE_ACE(torch.nn.Module):
@@ -430,7 +431,7 @@ class LE_ACE(torch.nn.Module):
 
         print("Features done")
 
-        print("Beginning hyperparameter optimization")
+        print("Beginning linear fit optimization")
 
         if do_gradients:
             train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
@@ -444,77 +445,48 @@ class LE_ACE(torch.nn.Module):
 
         symm = X_train.T @ X_train
         vec = X_train.T @ train_targets
-        alpha_list = np.linspace(-12.5, -2.5, 21)
-
-        # alpha_list = np.linspace(-10.0, 10.0, 41)
         n_feat = X_train.shape[1]
-        print("Number of features: ", n_feat)
+        print("Total number of features: ", n_feat)
 
-        # from torch_mkl64 import mkl64
-        # from scipy.sparse.linalg import cg
+        alpha_start = -10.0
+        beta_start = 0.0
 
-        best_opt_target = 1e30
-        for beta in [-2.0, -1.0, 0.0, 1.0, 2.0]:
-            print("beta=", beta)
+        solver = Solver(n_feat, self.extended_LE_energies, alpha_start, beta_start, self.nu_max).to(self.device)
+        optimizer = torch.optim.LBFGS(solver.parameters(), max_iter=5)
 
-            LE_reg = [tensor.clone() for tensor in self.extended_LE_energies]
-            for nu in range(self.nu_max+1):
-                LE_reg[nu] *= np.exp(beta*nu)
-            LE_reg = torch.concatenate(LE_reg)
-            assert LE_reg.shape[0] == symm.shape[0]
+        loss_list = []
+        alpha_list = []
+        beta_list = []
 
-            for alpha in alpha_list-beta*1.5:
-                #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
-                for i in range(n_feat):
-                    symm[i, i] += 10**alpha*LE_reg[i]
+        def closure():
+            optimizer.zero_grad()
 
-                try:
-                    # c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
-                    #print(symm)
-                    #print(vec)
-                    c = torch.linalg.solve(symm, vec)
-                    # c, info = cg(symm.numpy(force=True), vec.numpy(force=True), atol=1e-10, tol=1e-12)
-                    # c = torch.tensor(c)
-                    """if info != 0:
-                        print(info)
-                        opt_target.append(1e30)
-                        for i in range(n_feat):
-                            symm[i, i] -= 10.0**alpha*LE_reg[i]
-                        continue"""
-                    # c = mkl64.dposv(symm, vec)
-                except Exception as e:
-                    print(e)
-                    opt_target = 1e30
-                    for i in range(n_feat):
-                        symm[i, i] -= 10.0**alpha*LE_reg[i]
-                    continue
-                train_predictions = X_train @ c
-                validation_predictions = X_validation @ c
-                # print("Residual:", torch.sqrt(torch.sum((vec-symm@c)**2)))
+            c = solver(symm, vec)
+            validation_predictions = X_validation @ c
 
-                print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item(), get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/force_weight, get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight, get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight)
-                if opt_target_name == "mae":
-                    if do_gradients:
-                        opt_target = get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight
-                    else:
-                        opt_target = get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item()
-                else:
-                    if do_gradients:
-                        opt_target = get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight
-                    else:    
-                        opt_target = get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item()
+            if opt_target_name == "mae":
+                loss = get_sae(validation_predictions, validation_targets)
+            else:
+                loss = get_sse(validation_predictions, validation_targets)
+            
+            print(f"alpha={solver.alpha.item()} beta={solver.beta.item()} loss={loss.item()}")
+            loss_list.append(loss.item())
+            alpha_list.append(solver.alpha.item())
+            beta_list.append(solver.beta.item())
 
-                if opt_target < best_opt_target:
-                    best_opt_target = opt_target
-                    best_alpha = alpha
-                    best_beta = beta
+            loss.backward()
+            return loss
 
-                for i in range(n_feat):
-                    symm[i, i] -= 10.0**alpha*LE_reg[i]
 
+        n_cycles = 4
+        for i_cycle in range(n_cycles):
+            _ = optimizer.step(closure)
+            print(f"Finished step {i_cycle+1} out of {n_cycles}")
+
+        where_best_loss = np.argmin(np.nan_to_num(loss_list, nan=1e100))
+        best_alpha = alpha_list[where_best_loss]
+        best_beta = beta_list[where_best_loss]
         print("Best parameters:", best_alpha, best_beta)
-        if best_beta == -2.0 or best_beta == 2.0:
-            print("WARNING: hit grid search boundary")
 
         LE_reg = [tensor.clone() for tensor in self.extended_LE_energies]
         for nu in range(self.nu_max+1):
