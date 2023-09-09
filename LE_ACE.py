@@ -204,12 +204,12 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         optimizer.zero_grad()
 
         c = solver(symm, vec)
-        validation_predictions = X_validation @ c
+        test_predictions = X_test @ c
 
         if opt_target_name == "mae":
-            loss = get_sae(validation_predictions, validation_targets)
+            loss = get_sae(test_predictions, test_targets)
         else:
-            loss = get_sse(validation_predictions, validation_targets)
+            loss = get_sse(test_predictions, test_targets)
         
         print(f"alpha={solver.alpha.item()} beta={solver.beta.item()} loss={loss.item()}")
         loss_list.append(loss.item())
