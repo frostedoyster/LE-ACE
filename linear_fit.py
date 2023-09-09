@@ -2,7 +2,8 @@ import numpy as np
 import torch
 import argparse
 
-from utils.error_measures import get_rmse, get_mae
+from utils.solver import Solver
+from utils.error_measures import get_rmse, get_mae, get_sse, get_sae
 
 torch.set_default_dtype(torch.float64)
 
@@ -21,6 +22,7 @@ def run_fit(X_train_path, X_test_path, y_train_path, y_test_path, LE_reg_path, m
     X_test = torch.load(X_test_path)
     train_targets = torch.load(y_train_path)
     test_targets = torch.load(y_test_path)
+    LE_reg = torch.load(LE_reg_path)
 
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
@@ -29,66 +31,44 @@ def run_fit(X_train_path, X_test_path, y_train_path, y_test_path, LE_reg_path, m
     n_feat = X_train.shape[1]
     print("Number of features: ", n_feat)
 
-    best_opt_target = 1e30
-    for beta in [-2.0, -1.0, 0.0, 1.0, 2.0]:  # reproduce
-        print("beta=", beta)
+    alpha_start = -10.0
+    beta_start = 0.0
 
-        LE_reg = torch.load(LE_reg_path)
-        nu_max = len(LE_reg) - 1
-        for nu in range(nu_max+1):
-            LE_reg[nu] *= np.exp(beta*nu)
-        LE_reg = torch.concatenate(LE_reg)
+    solver = Solver(n_feat, LE_reg, alpha_start, beta_start, self.nu_max).to(self.device)
+    optimizer = torch.optim.LBFGS(solver.parameters(), max_iter=5)
 
-        for alpha in alpha_list-beta*1.5:
-            #X_train[-1, :] = torch.sqrt(10**alpha*LE_reg)
-            for i in range(n_feat):
-                symm[i, i] += 10**alpha*LE_reg[i]
+    loss_list = []
+    alpha_list = []
+    beta_list = []
 
-            try:
-                # c = torch.linalg.lstsq(X_train, train_targets, driver = "gelsd", rcond = 1e-8).solution
-                c = torch.linalg.solve(symm, vec)
-                # c, info = cg(symm.numpy(force=True), vec.numpy(force=True), atol=1e-10, tol=1e-12)
-                # c = torch.tensor(c)
-                """if info != 0:
-                    print(info)
-                    opt_target.append(1e30)
-                    for i in range(n_feat):
-                        symm[i, i] -= 10.0**alpha*LE_reg[i]
-                    continue"""
-                # c = mkl64.dposv(symm, vec)
-            except Exception as e:
-                print(e)
-                opt_target = 1e30
-                for i in range(n_feat):
-                    symm[i, i] -= 10.0**alpha*LE_reg[i]
-                continue
-            train_predictions = X_train @ c
-            test_predictions = X_test @ c
-            # print("Residual:", torch.sqrt(torch.sum((vec-symm@c)**2)))
+    def closure():
+        optimizer.zero_grad()
 
-            print(alpha, get_rmse(train_predictions[:n_train], train_targets[:n_train]).item(), get_rmse(test_predictions[:n_test], test_targets[:n_test]).item(), get_mae(test_predictions[:n_test], test_targets[:n_test]).item(), get_rmse(train_predictions[n_train:], train_targets[n_train:]).item()/FORCE_WEIGHT, get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT, get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT)
-            if opt_target_name == "mae":
-                if do_gradients:
-                    opt_target = get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
-                else:
-                    opt_target = get_mae(test_predictions[:n_test], test_targets[:n_test]).item()
-            else:
-                if do_gradients:
-                    opt_target = get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/FORCE_WEIGHT
-                else:    
-                    opt_target = get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()
+        c = solver(symm, vec)
+        validation_predictions = X_validation @ c
 
-            if opt_target < best_opt_target:
-                best_opt_target = opt_target
-                best_alpha = alpha
-                best_beta = beta
+        if opt_target_name == "mae":
+            loss = get_sae(validation_predictions, validation_targets)
+        else:
+            loss = get_sse(validation_predictions, validation_targets)
+        
+        print(f"alpha={solver.alpha.item()} beta={solver.beta.item()} loss={loss.item()}")
+        loss_list.append(loss.item())
+        alpha_list.append(solver.alpha.item())
+        beta_list.append(solver.beta.item())
 
-            for i in range(n_feat):
-                symm[i, i] -= 10.0**alpha*LE_reg[i]
+        loss.backward()
+        return loss
 
+    n_cycles = 4
+    for i_cycle in range(n_cycles):
+        _ = optimizer.step(closure)
+        print(f"Finished step {i_cycle+1} out of {n_cycles}")
+
+    where_best_loss = np.argmin(np.nan_to_num(loss_list, nan=1e100))
+    best_alpha = alpha_list[where_best_loss]
+    best_beta = beta_list[where_best_loss]
     print("Best parameters:", best_alpha, best_beta)
-    if best_beta == -2.0 or best_beta == 2.0:
-        print("WARNING: hit grid search boundary")
 
     LE_reg = torch.load(LE_reg_path)
     for nu in range(nu_max+1):
