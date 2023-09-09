@@ -193,7 +193,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     alpha_start = -10.0
     beta_start = 0.0
 
-    solver = Solver(n_feat, self.extended_LE_energies, alpha_start, beta_start, self.nu_max).to(self.device)
+    solver = Solver(n_feat, self.extended_LE_energies, alpha_start, beta_start, nu_max).to(device)
     optimizer = torch.optim.LBFGS(solver.parameters(), max_iter=5)
 
     loss_list = []

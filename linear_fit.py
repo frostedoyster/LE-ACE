@@ -23,6 +23,7 @@ def run_fit(X_train_path, X_test_path, y_train_path, y_test_path, LE_reg_path, m
     train_targets = torch.load(y_train_path)
     test_targets = torch.load(y_test_path)
     LE_reg = torch.load(LE_reg_path)
+    nu_max = len(LE_reg) - 1
 
     symm = X_train.T @ X_train
     vec = X_train.T @ train_targets
@@ -34,7 +35,7 @@ def run_fit(X_train_path, X_test_path, y_train_path, y_test_path, LE_reg_path, m
     alpha_start = -10.0
     beta_start = 0.0
 
-    solver = Solver(n_feat, LE_reg, alpha_start, beta_start, self.nu_max).to(self.device)
+    solver = Solver(n_feat, LE_reg, alpha_start, beta_start, nu_max)
     optimizer = torch.optim.LBFGS(solver.parameters(), max_iter=5)
 
     loss_list = []
