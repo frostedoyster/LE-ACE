@@ -132,7 +132,7 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     n_test = len(test_structures)
     start_time = time.time()
     for test_structure in test_structures:
-        le_ace.predict([test_structure])
+        le_ace.predict([test_structure], do_positions_grad=True)
     finish_time = time.time()
     print(f"Evaluation took {(finish_time-start_time)/n_test} per structure")
 

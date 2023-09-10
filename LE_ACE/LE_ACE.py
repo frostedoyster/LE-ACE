@@ -175,7 +175,7 @@ class LE_ACE(torch.nn.Module):
 
         composition_features = composition_features_tmap.block(0).values.to(self.device)
         radial_spectrum = radial_spectrum_tmap.block(0).values.to(self.device)  # NEEDED DUE TO BUG
-        spherical_expansion = {(l,): block.values.swapaxes(0, 2) for (l,), block in spherical_expansion_tmap.items()}
+        spherical_expansion = {(key.values[0].item(),): block.values.swapaxes(0, 2) for key, block in spherical_expansion_tmap.items()}
 
         B_basis = self.ace_calculator(spherical_expansion)[(0, 1)]
         
@@ -247,7 +247,7 @@ class LE_ACE(torch.nn.Module):
 
         composition_features = composition_features_tmap.block(0).values.to(self.device)
         radial_spectrum = radial_spectrum_tmap.block(0).values.to(self.device)  # DUE TO BUG
-        spherical_expansion = {(l,): block.values.swapaxes(0, 2) for (l,), block in spherical_expansion_tmap.items()}
+        spherical_expansion = {(key.values[0].item(),): block.values.swapaxes(0, 2) for key, block in spherical_expansion_tmap.items()}
 
         comp_grad_metadata = composition_features_tmap.block(0).gradient("positions").samples.values.to(self.device)
         rs_grad_metadata = radial_spectrum_tmap.block(0).gradient("positions").samples.values.to(self.device)
@@ -256,13 +256,13 @@ class LE_ACE(torch.nn.Module):
         composition_features_grad = composition_features_tmap.block(0).gradient("positions").values.to(self.device)
         radial_spectrum_grad = radial_spectrum_tmap.block(0).gradient("positions").values.to(self.device)  # DUE TO BUG
         spherical_expansion_grad = {
-            (l,): block.gradient("positions").values.reshape(-1, block.gradient("positions").values.shape[2], block.gradient("positions").values.shape[3]).swapaxes(0, 2).reshape(
+            (key.values[0].item(),): block.gradient("positions").values.reshape(-1, block.gradient("positions").values.shape[2], block.gradient("positions").values.shape[3]).swapaxes(0, 2).reshape(
                 block.gradient("positions").values.shape[3],
                 block.gradient("positions").values.shape[2],
                 block.gradient("positions").values.shape[0],
                 block.gradient("positions").values.shape[1]
             )
-            for (l,), block in spherical_expansion_tmap.items()
+            for key, block in spherical_expansion_tmap.items()
         }
 
         B_basis, B_basis_gradients = self.ace_calculator.compute_with_gradients(spherical_expansion, spherical_expansion_grad, spex_grad_metadata[:, 0])
