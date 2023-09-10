@@ -128,6 +128,13 @@ def run_fit(parameters, n_train, RANDOM_SEED):
     print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation RMSE forces"])
     print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation MAE forces"])
 
+    import time
+    n_test = len(test_structures)
+    start_time = time.time()
+    for test_structure in test_structures:
+        le_ace.predict([test_structure])
+    finish_time = time.time()
+    print(f"Evaluation took {(finish_time-start_time)/n_test} per structure")
 
 
 if __name__ == "__main__":

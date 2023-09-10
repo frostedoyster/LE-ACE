@@ -1,12 +1,14 @@
 import numpy as np
 import torch
 import rascaline.torch
+from metatensor.torch import Labels
+
 from .LE_initialization import initialize_basis
 from .LE_metadata import get_le_metadata
 from .generalized_cgs import get_generalized_cgs
 from .ACE_calculator import ACECalculator
 from .solver import Solver
-from metatensor.torch import Labels
+from .structures import transform_structures
 
 from .LE_expansion import get_LE_expansion
 from .TRACE_expansion import get_TRACE_expansion
@@ -121,16 +123,38 @@ class LE_ACE(torch.nn.Module):
                     (self.n_species,)  # Account for different a_i
                 )
             self.extended_LE_energies.append(extended_LE_energies_nu)
-        print([tensor.shape[0] for tensor in self.extended_LE_energies])
+        print("Number of features per body-order:", [tensor.shape[0] for tensor in self.extended_LE_energies])
+
+        # Dummy properties, to be changed: FIXME
+        self.properties_per_atom = (
+            [Labels.range("property", 1)]
+            +
+            [Labels.range("property", self.n_max_rs*(self.n_trace if self.is_trace else self.n_species))]
+            +
+            [
+                Labels.range(
+                    "property",
+                    sum([self.generalized_cgs[(0, 1)][nu][l_tuple].shape[0] for l_tuple in self.fixed_order_l_tuples[nu]])
+                )
+                for nu in range(2, nu_max+1)
+            ]
+        )
+        self.properties_per_structure = [Labels.range("property", len(LE_energies)) for LE_energies in self.extended_LE_energies]
 
         self.nu0_calculator_train = rascaline.torch.AtomicComposition(per_structure=False)
         self.radial_spectrum_calculator_train = radial_spectrum_calculator
         self.spherical_expansion_calculator_train = spherical_expansion_calculator
         self.ace_calculator = ACECalculator(l_max, self.combine_indices, self.multiplicities, self.generalized_cgs)
 
+        self.prediction_coefficients = None  # to be set during training
+
     def compute_features(self, structures):
+
+        # transform if not already done
+        if not isinstance(structures[0], torch.ScriptObject):
+            structures = transform_structures(structures)
+
         n_structures = len(structures)
-        structures = rascaline.torch.systems_to_torch(structures)
 
         composition_features_tmap = self.nu0_calculator_train.compute(structures)
         composition_features_tmap = composition_features_tmap.keys_to_samples("species_center")
@@ -190,7 +214,6 @@ class LE_ACE(torch.nn.Module):
             )
         
         # Concatenate different body-orders:
-        print("Number of features per body-order:", [B_basis_per_structure[nu].shape[1] for nu in range(0, self.nu_max+1)])
         B_basis_all_together = torch.concatenate([B_basis_per_structure[nu] for nu in range(0, self.nu_max+1)], dim=1)
 
         return B_basis_all_together
@@ -198,7 +221,10 @@ class LE_ACE(torch.nn.Module):
     def compute_features_with_gradients(self, structures):
 
         n_structures = len(structures)
-        structures = rascaline.torch.systems_to_torch(structures)
+        
+        # transform if not already done
+        if not isinstance(structures[0], torch.ScriptObject):
+            structures = transform_structures(structures)
 
         gradients = ["positions"]
 
@@ -313,23 +339,12 @@ class LE_ACE(torch.nn.Module):
         # Concatenate different body-orders:
         B_basis_all_together = torch.concatenate([B_basis_per_structure[nu] for nu in range(0, self.nu_max+1)], dim=1)
         B_basis_all_together_grad = torch.concatenate([B_basis_per_structure_grad[nu] for nu in range(0, self.nu_max+1)], dim=2)
-        print("Number of features per body-order:", [B_basis_per_structure[nu].shape[1] for nu in range(0, self.nu_max+1)])
 
         return B_basis_all_together, B_basis_all_together_grad
-
 
     def forward():
         # Allows training with backpropagation
         raise NotImplementedError()
-
-
-    def to_predict():
-
-        # Prepare the LE_ACE_predict class
-        raise NotImplementedError()
-
-        return le_ace_predict
-
 
     def train(self, train_structures, validation_structures=None, test_structures=None, training_style="linear algebra", backend="rascaline", target_key="energy", batch_size=None, do_gradients=False, force_weight=0.03, opt_target_name="rmse"):
 
@@ -344,21 +359,15 @@ class LE_ACE(torch.nn.Module):
         else:
             n_validation = len(validation_structures)
 
-        if test_structures is not None: n_test = len(test_structures)
-
         if batch_size is None:
             batch_size = 10 if do_gradients else 100
 
         train_energies = torch.tensor([structure.info[target_key] for structure in train_structures], dtype=torch.get_default_dtype(), device=self.device)
         validation_energies = torch.tensor([structure.info[target_key] for structure in validation_structures], dtype=torch.get_default_dtype(), device=self.device)
-        if test_structures is not None: 
-            test_energies = torch.tensor([structure.info[target_key] for structure in test_structures], dtype=torch.get_default_dtype(), device=self.device)
 
         if do_gradients:
             train_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in train_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)*force_weight
             validation_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in validation_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)*force_weight
-            if test_structures is not None:
-                test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)*force_weight
 
         # Divide training and test set into batches (to limit memory usage):
         def get_batches(list: list, batch_size: int) -> list:
@@ -372,7 +381,6 @@ class LE_ACE(torch.nn.Module):
 
         train_structures = get_batches(train_structures, batch_size)
         validation_structures = get_batches(validation_structures, batch_size)
-        if test_structures is not None: validation_structures = get_batches(test_structures, batch_size)
 
         X_train_batches = []
         X_train_batches_grad = []
@@ -410,25 +418,6 @@ class LE_ACE(torch.nn.Module):
         else:
             X_validation = torch.concat(X_validation_batches, dim = 0)
 
-        if test_structures is not None:
-            X_test_batches = []
-            X_test_batches_grad = []
-            for i_batch, batch in enumerate(test_structures):
-                print(f"DOING TEST BATCH {i_batch+1} out of {len(test_structures)}")
-                if do_gradients:
-                    values, gradients = self.compute_features_with_gradients(batch)
-                    gradients = -force_weight*gradients.reshape(gradients.shape[0]*3, values.shape[1])
-                    X_test_batches.append(values)
-                    X_test_batches_grad.append(gradients)
-                else:
-                    values = self.compute_features(batch)
-                    X_test_batches.append(values)
-
-            if do_gradients:
-                X_test = torch.concat(X_test_batches + X_test_batches_grad, dim = 0)
-            else:
-                X_test = torch.concat(X_test_batches, dim = 0)
-
         print("Features done")
 
         print("Beginning linear fit optimization")
@@ -436,12 +425,9 @@ class LE_ACE(torch.nn.Module):
         if do_gradients:
             train_targets = torch.concat([train_energies, train_forces.reshape((-1,))])
             validation_targets = torch.concat([validation_energies, validation_forces.reshape((-1,))])
-            if test_structures is not None: test_targets = torch.concat([test_energies, test_forces.reshape((-1,))])
         else:
             train_targets = train_energies
             validation_targets = validation_energies
-            if test_structures is not None:
-                test_targets = test_energies
 
         symm = X_train.T @ X_train
         vec = X_train.T @ train_targets
@@ -477,7 +463,6 @@ class LE_ACE(torch.nn.Module):
             loss.backward()
             return loss
 
-
         n_cycles = 4
         for i_cycle in range(n_cycles):
             _ = optimizer.step(closure)
@@ -497,17 +482,91 @@ class LE_ACE(torch.nn.Module):
             symm[i, i] += 10**best_alpha*LE_reg[i]
         c = torch.linalg.solve(symm, vec)
 
+        # register prediction coefficients for evaluation
+        self.prediction_coefficients = c
+
         validation_predictions = X_validation @ c
         print("n_train:", n_train, "n_features:", n_feat)
-        print(f"Validation set RMSE (E): {get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item()} [MAE (E): {get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item()}], RMSE (F): {get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight} [MAE (F): {get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight}]")
 
-        if test_structures is not None:
-            validation_predictions = X_validation @ c
-            print(f"Test set RMSE (E): {get_rmse(test_predictions[:n_test], test_targets[:n_test]).item()} [MAE (E): {get_mae(test_predictions[:n_test], test_targets[:n_test]).item()}], RMSE (F): {get_rmse(test_predictions[n_test:], test_targets[n_test:]).item()/force_weight} [MAE (F): {get_mae(test_predictions[n_test:], test_targets[n_test:]).item()/force_weight}]")
+        validation_rmse_energies = get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item()
+        validation_mae_energies = get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item()
+        if do_gradients:
+            validation_rmse_forces = get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight
+            validation_mae_forces = get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight
+        else:
+            validation_rmse_forces = None
+            validation_mae_forces = None 
+        print(f"Validation set RMSE (E): {validation_rmse_energies} [MAE (E): {validation_mae_energies}], RMSE (F): {validation_rmse_forces} [MAE (F): {validation_mae_forces}]")
 
-        return {
-            "validation RMSE energies": get_rmse(validation_predictions[:n_validation], validation_targets[:n_validation]).item(),
-            "validation MAE energies": get_mae(validation_predictions[:n_validation], validation_targets[:n_validation]).item(),
-            "validation RMSE forces": get_rmse(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight if do_gradients else None,
-            "validation MAE forces": get_mae(validation_predictions[n_validation:], validation_targets[n_validation:]).item()/force_weight if do_gradients else None,
+        return_dict = {
+            "validation RMSE energies": validation_rmse_energies,
+            "validation MAE energies": validation_mae_energies,
         }
+
+        if do_gradients:
+            return_dict["validation RMSE forces"] = validation_rmse_forces
+            return_dict["validation MAE forces"] = validation_mae_forces
+
+        # Now, if requested, we test on the test set:
+        if test_structures is not None:
+            test_energies = torch.tensor([structure.info[target_key] for structure in test_structures], dtype=torch.get_default_dtype(), device=self.device)
+            if do_gradients:
+                test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)
+            
+            predictions_dict = self.predict(test_structures, do_positions_grad=do_gradients)
+            test_predictions_energies = predictions_dict["values"]
+            test_predictions_forces = -predictions_dict["positions gradient"]
+
+            test_rmse_energies = get_rmse(test_energies, test_predictions_energies).item()
+            test_mae_energies = get_mae(test_energies, test_predictions_energies).item()
+
+            if do_gradients:
+                test_rmse_forces = get_rmse(test_forces, test_predictions_forces).item()
+                test_mae_forces = get_mae(test_forces, test_predictions_forces).item()
+            else:
+                test_rmse_forces = None
+                test_mae_forces = None
+
+            print(f"Test set RMSE (E): {test_rmse_energies} [MAE (E): {test_mae_energies}], RMSE (F): {test_rmse_forces} [MAE (F): {test_mae_forces}]")
+
+            return_dict["test RMSE energies"] = test_rmse_energies
+            return_dict["test MAE energies"] = test_mae_energies
+            if do_gradients:
+                return_dict["test RMSE forces"] = test_rmse_forces
+                return_dict["test MAE forces"] = test_mae_forces
+
+        return return_dict
+
+    def predict(self, structures, do_positions_grad=False, do_cells_grad=False):
+        # A relatively slow predictor implementation
+        structures = transform_structures(structures, positions_requires_grad=do_positions_grad, cells_requires_grad=do_cells_grad)
+        features = self.compute_features(structures)
+        predictions = features @ self.prediction_coefficients
+
+        predictions_dict = {
+            "values": predictions
+        }
+
+        # !!!!!!!! Only works for the prediction of scalars.
+        # torch.autograd.jacobian might be usable to do higher-order tensors
+        if do_positions_grad:
+            positions_grad = torch.autograd.grad(
+                outputs=predictions,
+                inputs=[structure.positions for structure in structures],
+                grad_outputs=torch.ones_like(predictions),
+                retain_graph=False,
+                create_graph=False,
+            )
+            predictions_dict["positions gradient"] = torch.concatenate(positions_grad)
+
+        if do_cells_grad:
+            raise NotImplementedError()
+
+        return predictions_dict
+
+    def to_fast_predictor():
+
+        # Prepare the LE_ACE_predict class
+        raise NotImplementedError()
+
+        return le_ace_predict
