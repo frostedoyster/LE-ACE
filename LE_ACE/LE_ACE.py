@@ -9,6 +9,7 @@ from .generalized_cgs import get_generalized_cgs
 from .ACE_calculator import ACECalculator
 from .solver import Solver
 from .structures import transform_structures
+from .ACE_evaluator import ACEEvaluator
 
 from .LE_expansion import get_LE_expansion
 from .TRACE_expansion import get_TRACE_expansion
@@ -43,12 +44,12 @@ class LE_ACE(torch.nn.Module):
         self.all_species = [int(species) for species in all_species]
         self.n_species = len(all_species)
         self.all_species_tensor = torch.tensor(all_species, dtype=torch.long, device=self.device)
-        self.species_to_species_index = torch.zeros(max(all_species)+1, dtype=torch.long, device=self.device)
         self.is_trace = is_trace
         if self.is_trace:
             self.n_trace = n_trace
             self.trace_comb = torch.tensor(np.random.normal(size=(self.n_species, n_trace)), device=device)
 
+        self.species_to_species_index = torch.zeros(max(all_species)+1, dtype=torch.long, device=self.device)
         counter = 0
         for species in all_species:
             self.species_to_species_index[species] = counter
@@ -60,14 +61,15 @@ class LE_ACE(torch.nn.Module):
         l_max, self.E_nl, spherical_expansion_calculator = initialize_basis(r_cut, False, E_max[2], le_type, factor, factor2, cost_trade_off=cost_trade_off)
 
         E_ln = self.E_nl.T
-        n_max_l = []
+        self.n_max_l = []
         for l in range(l_max+1):
-            n_max_l.append(np.where(self.E_nl[:, l] <= E_max[2])[0][-1] + 1)
-        print(self.n_max_rs)
-        print(n_max_l)
-        E_ln = [E_ln[l][:n_max_l[l]] for l in range(l_max+1)]
+            self.n_max_l.append(np.where(self.E_nl[:, l] <= E_max[2])[0][-1] + 1)
+        print("Radial spectrum:", self.n_max_rs)
+        print("Spherical expansion", self.n_max_l)
+        self.l_max = len(self.n_max_l) - 1
+        E_ln = [E_ln[l][:self.n_max_l[l]] for l in range(l_max+1)]
 
-        self.combine_indices, self.multiplicities, self.LE_energies = get_le_metadata(all_species, E_max, n_max_l, E_ln, is_trace, n_trace, device)
+        self.combine_indices, self.multiplicities, self.LE_energies = get_le_metadata(all_species, E_max, self.n_max_l, E_ln, is_trace, n_trace, device)
 
         l_tuples = [0, 1] + [list(self.combine_indices[nu].keys()) for nu in range(2, nu_max+1)]
         requested_L_sigma_pairs = [(0, 1)]
@@ -513,9 +515,15 @@ class LE_ACE(torch.nn.Module):
             if do_gradients:
                 test_forces = torch.tensor(np.concatenate([structure.get_forces() for structure in test_structures], axis = 0), dtype=torch.get_default_dtype(), device=self.device)
             
-            predictions_dict = self.predict(test_structures, do_positions_grad=do_gradients)
-            test_predictions_energies = predictions_dict["values"]
-            test_predictions_forces = -predictions_dict["positions gradient"]
+            test_batches = get_batches(test_structures, batch_size)
+            test_predictions_energies = []
+            if do_gradients: test_predictions_forces = []
+            for test_batch in test_batches:
+                predictions_dict = self.predict(test_batch, do_positions_grad=do_gradients)
+                test_predictions_energies.append(predictions_dict["values"])
+                if do_gradients: test_predictions_forces.append(-predictions_dict["positions gradient"])
+            test_predictions_energies = torch.concatenate(test_predictions_energies)
+            test_predictions_forces = torch.concatenate(test_predictions_forces)
 
             test_rmse_energies = get_rmse(test_energies, test_predictions_energies).item()
             test_mae_energies = get_mae(test_energies, test_predictions_energies).item()
@@ -557,16 +565,143 @@ class LE_ACE(torch.nn.Module):
                 retain_graph=False,
                 create_graph=False,
             )
-            predictions_dict["positions gradient"] = torch.concatenate(positions_grad)
+            predictions_dict["positions gradient"] = torch.concatenate(positions_grad).to(self.device)  # These are always created on CPU
 
         if do_cells_grad:
             raise NotImplementedError()
 
         return predictions_dict
 
-    def to_fast_predictor():
+    def get_fast_evaluator(self):
 
-        # Prepare the LE_ACE_predict class
-        raise NotImplementedError()
+        if self.prediction_coefficients is None:
+            raise ValueError("The model has not been trained yet.")
 
-        return le_ace_predict
+        if self.is_trace:
+            raise NotImplementedError
+
+        # Split prediction coefficients according to body-order:
+        body_order_split_sizes = [tensor.shape[0] for tensor in self.extended_LE_energies]
+
+        split_nu_coefficients = torch.split(self.prediction_coefficients, body_order_split_sizes)
+
+        for split_coefficients_single_nu in split_nu_coefficients[1:]:
+            assert split_coefficients_single_nu.shape[0] % self.n_species == 0
+        split_nu_ai_coefficients = [0] + [torch.split(split_coefficients_single_nu, split_coefficients_single_nu.shape[0]//self.n_species) for split_coefficients_single_nu in split_nu_coefficients[1:]]
+
+        split_coefficients = [split_coefficients_single_nu[0]]
+        split_coefficients.append([])
+        for ai_index in range(self.n_species):
+            split_coefficients[1].append([])
+            split_coefficients[1][ai_index].append(split_nu_ai_coefficients[1][ai_index])
+        for nu in range(2, self.nu_max+1):
+            split_coefficients.append([])
+            for ai_index in range(self.n_species):
+                split_coefficients[nu].append(
+                    torch.split(
+                        split_nu_ai_coefficients[nu][ai_index],
+                        [self.generalized_cgs[(0, 1)][nu][l_tuple].shape[0]*self.multiplicities[nu][l_tuple].shape[0] for l_tuple in self.fixed_order_l_tuples[nu]]
+                    )
+                )
+
+
+        # REVERSEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE? Is this needed? 
+        combine_indices_nu1 = [0, 1]
+        for nu in range(2, self.nu_max+1):
+            combine_indices_nu1.append([])
+            for l_tuple_nu in self.fixed_order_l_tuples[nu]:
+                combine_indices_nu1_l_tuple_nu = []
+                previous_iota_indices = torch.arange(0, self.combine_indices[nu][l_tuple_nu][1].shape[0], dtype=torch.long)
+                current_tuple = l_tuple_nu
+                for iota in range(nu, 1, -1):
+                    current_combine_indices = self.combine_indices[iota][current_tuple]
+                    combine_indices_nu1_l_tuple_nu.append(
+                        current_combine_indices[1][previous_iota_indices]
+                    )
+                    if iota == 2:
+                        combine_indices_nu1_l_tuple_nu.append(
+                            current_combine_indices[0][previous_iota_indices]
+                        )
+                    else:
+                        previous_iota_indices = current_combine_indices[0][previous_iota_indices]
+                    current_tuple = current_tuple[:-1]
+
+                combine_indices_nu1_l_tuple_nu.reverse()
+                combine_indices_nu1[nu].append(
+                    torch.stack(combine_indices_nu1_l_tuple_nu, dim=1)
+                )
+
+        multipliers = [
+            self.prediction_coefficients[0],
+            torch.stack([coefficients_1_ai for coefficients_1_ai in split_nu_ai_coefficients[1]])    
+        ]
+        for nu in range(2, self.nu_max+1):
+            multipliers_nu = []
+            for ai_index in range(self.n_species):
+                multipliers_nu_ai = []
+                for index_l_tuple_nu, l_tuple_nu in enumerate(self.fixed_order_l_tuples[nu]):
+                    C = self.generalized_cgs[(0, 1)][nu][l_tuple_nu]  # m, L_tuple
+                    c = split_coefficients[nu][ai_index][index_l_tuple_nu]  # L_tuple, b
+                    m = self.multiplicities[nu][l_tuple_nu]  # b
+                    multipliers_l_tuple = (C.T @ c.reshape(C.shape[0], m.shape[0])) * m.unsqueeze(0)
+                    multipliers_nu_ai.append(multipliers_l_tuple.flatten())  # m_tuple, b
+                multipliers_nu_ai = torch.concatenate(multipliers_nu_ai)
+                multipliers_nu.append(multipliers_nu_ai)
+            multipliers_nu = torch.stack(multipliers_nu)
+            multipliers.append(multipliers_nu)
+
+        l_lengths = torch.tensor(
+            [self.n_species * self.n_max_l[l] for l in range(self.l_max+1)]
+        )
+        l_shifts = torch.cumsum(
+            torch.tensor(
+                [0] + [self.n_species * self.n_max_l[l] * (2*l+1) for l in range(self.l_max+1)]
+            ),
+            0
+        )
+
+        final_combine_indices = [0, 1]
+        for nu in range(2, self.nu_max+1):
+            final_combine_indices.append([])
+            for index_l_tuple_nu, l_tuple_nu in enumerate(self.fixed_order_l_tuples[nu]):
+                l_1 = l_tuple_nu[0]
+                current_m_range = torch.arange(2*l_1+1, dtype=torch.int).reshape(-1, 1)
+                for iota in range(1, nu):
+                    new_l = l_tuple_nu[iota]
+                    new_m_range = torch.arange(2*new_l+1, dtype=torch.int)
+                    current_m_range = torch.concatenate(
+                        [
+                            torch.repeat_interleave(current_m_range, len(new_m_range), dim=0),
+                            new_m_range.repeat(len(current_m_range)).reshape(-1, 1)
+                        ],
+                        dim=1
+                    )
+                m_tuples = torch.repeat_interleave(current_m_range, len(combine_indices_nu1[nu][index_l_tuple_nu]), dim=0)
+                b_1 = combine_indices_nu1[nu][index_l_tuple_nu].repeat((len(current_m_range), 1))
+                assert m_tuples.shape == b_1.shape
+                final_combine_indices_l_tuple_nu = torch.empty_like(b_1)
+                for iota in range(nu):
+                    final_combine_indices_l_tuple_nu[:, iota] = l_shifts[l_tuple_nu[iota]] + l_lengths[l_tuple_nu[iota]] * m_tuples[:, iota] + b_1[:, iota]
+                final_combine_indices[nu].append(final_combine_indices_l_tuple_nu)
+            final_combine_indices[nu] = torch.concatenate(final_combine_indices[nu])
+
+        for nu in range(2, self.nu_max+1):
+            assert multipliers[nu].shape[1] == final_combine_indices[nu].shape[0]
+            where_nonzero = torch.where(torch.sum((multipliers[nu] != 0.0).to(torch.int), dim=0) != 0)[0]  # at least one non-zero element
+            #multipliers[nu] = multipliers[nu][:, where_nonzero]
+            #final_combine_indices[nu] = final_combine_indices[nu][where_nonzero]
+            print("nu", nu, ", number of polynomials", final_combine_indices[nu].shape[0])
+
+        return ACEEvaluator(
+            all_species=self.all_species,
+            composition_calculator=self.nu0_calculator_train,
+            radial_spectrum_calculator=self.radial_spectrum_calculator_train,
+            spherical_expansion_calculator=self.spherical_expansion_calculator_train,
+            combine_indices=final_combine_indices,
+            multipliers=multipliers,
+            l_max=self.l_max,
+            E_nl=self.E_nl,
+            E_n0=self.E_n0,
+            E_max=self.E_max,
+            device=self.device
+        )

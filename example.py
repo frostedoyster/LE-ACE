@@ -121,12 +121,31 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         validation_structures=test_structures,
         do_gradients=do_gradients,
         opt_target_name=opt_target_name,
+        target_key=TARGET_KEY,
+        force_weight=FORCE_WEIGHT,
+        batch_size=BATCH_SIZE
     )
 
     print(ENERGY_CONVERSION_FACTOR*accuracy_dict["validation RMSE energies"])
     print(ENERGY_CONVERSION_FACTOR*accuracy_dict["validation MAE energies"])
-    print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation RMSE forces"])
-    print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation MAE forces"])
+    if do_gradients:
+        print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation RMSE forces"])
+        print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation MAE forces"])
+
+    le_ace_predictor = le_ace.get_fast_evaluator()
+
+    import time
+    from LE_ACE.structures import transform_structures
+    from copy import deepcopy
+    n_test = len(test_structures)
+    test_structures = [test_structures[0], deepcopy(test_structures[0])]
+    test_structures[1].rotate("x", 45.458)
+    test_structures = transform_structures(test_structures)
+    for test_structure in test_structures:
+        energy = le_ace.predict([test_structure])
+        print(energy)
+        energy = le_ace_predictor([test_structure])
+        print(energy)
 
     import time
     n_test = len(test_structures)

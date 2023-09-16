@@ -70,7 +70,6 @@ class ACECalculator(torch.nn.Module):
 
         return B_basis
 
-
     def compute_with_gradients(self, LE_1_values, LE_1_gradients, gradient_metadata):
         # LE_1_values is in format (l) -> [b, m, i]
         # LE_1_gradients is in format (l) -> [b, m, ij, alpha]

@@ -111,7 +111,7 @@ def initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off=False):
         n_max,
         l_max,
         a,
-        requested_accuracy = 1e-6
+        requested_accuracy = 1e-8
     )
     print("Number of spline points:", len(spline_points))
 
