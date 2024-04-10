@@ -126,11 +126,13 @@ def run_fit(parameters, n_train, RANDOM_SEED):
         batch_size=BATCH_SIZE
     )
 
-    print(ENERGY_CONVERSION_FACTOR*accuracy_dict["validation RMSE energies"])
-    print(ENERGY_CONVERSION_FACTOR*accuracy_dict["validation MAE energies"])
+    print("validation RMSE energies", ENERGY_CONVERSION_FACTOR*accuracy_dict["validation RMSE energies"])
+    print("validation MAE energies", ENERGY_CONVERSION_FACTOR*accuracy_dict["validation MAE energies"])
     if do_gradients:
-        print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation RMSE forces"])
-        print(FORCE_CONVERSION_FACTOR*accuracy_dict["validation MAE forces"])
+        print("validation RMSE forces", FORCE_CONVERSION_FACTOR*accuracy_dict["validation RMSE forces"])
+        print("validation MAE forces", FORCE_CONVERSION_FACTOR*accuracy_dict["validation MAE forces"])
+
+    exit()
 
     le_ace_predictor = le_ace.get_fast_evaluator()
 

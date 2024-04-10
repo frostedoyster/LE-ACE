@@ -26,7 +26,7 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
             if E_nl[n, l] <= E_max: 
                 TRACE_values[:, :, counter_TRACE] = block.values[:, :, counter_total]
                 if do_gradients: TRACE_gradients[:, :, :, counter_TRACE] = block.gradient("positions").values[:, :, :, counter_total]
-                labels_TRACE.append([species_remapping[int(block.properties["species_neighbor"][counter_total])], n, l, l])
+                labels_TRACE.append([species_remapping[int(block.properties["neighbor_type"][counter_total])], n, l, l])
                 counter_TRACE += 1
             counter_total += 1
         TRACE_block = TensorBlock(
@@ -67,8 +67,8 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species, device) -> 
         species_remapping[species] = i_species
 
     TRACE_blocks = []
-    for species_center in all_species:  # TODO: do not rely on all_species, which is used for the neighbors but some may be missing from the centers
-        block = map.block({"species_center": species_center})
+    for center_type in all_species:  # TODO: do not rely on all_species, which is used for the neighbors but some may be missing from the centers
+        block = map.block({"center_type": center_type})
         l = 0
         counter = 0
         for n in block.properties["n"]:
@@ -82,7 +82,7 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species, device) -> 
             if E_n[n] <= E_max: 
                 TRACE_values[:, counter_TRACE] = block.values[:, counter_total]
                 if do_gradients: TRACE_gradients[:, :, counter_TRACE] = block.gradient("positions").values[:, :, counter_total]
-                labels_TRACE.append([species_remapping[int(block.properties["species_neighbor"][counter_total])], n, l, l])
+                labels_TRACE.append([species_remapping[int(block.properties["neighbor_type"][counter_total])], n, l, l])
                 counter_TRACE += 1
             counter_total += 1
         TRACE_block = TensorBlock(
@@ -122,7 +122,7 @@ def get_TRACE_expansion(structures, calculator, E_nl, E_max, all_species, contra
     spherical_expansion_coefficients = calculator.compute(structures, gradients=gradients)
 
     all_neighbor_species = Labels(
-            names=["species_neighbor"],
+            names=["neighbor_type"],
             values=torch.tensor(all_species, device=device).reshape(-1, 1),
         )
         

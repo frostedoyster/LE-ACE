@@ -43,7 +43,7 @@ class ACEEvaluator(torch.nn.Module):
     def forward(self, structure_list):
 
         composition = self.composition_calculator(structure_list)
-        composition = composition.keys_to_samples("species_center")
+        composition = composition.keys_to_samples("center_type")
         composition_energies = composition.block().values.sum(dim=1) * self.multipliers[0]
 
         radial_spectrum = get_LE_expansion(structure_list, self.radial_spectrum_calculator, self.E_n0, self.E_max[1], self.all_species, rs=True, do_gradients=True, device=self.device)

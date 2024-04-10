@@ -60,7 +60,7 @@ def get_minimum_distance(structures):
     sd_hypers = {
         "cutoff": 5.0,
         "max_neighbors": 100,
-        "separate_neighbor_species": False
+        "separate_neighbor_types": False
     }
     sd_calculator = rascaline.torch.SortedDistances(**sd_hypers)
     sds = sd_calculator.compute(rascaline.torch.systems_to_torch(structures))

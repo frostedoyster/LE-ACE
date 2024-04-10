@@ -105,15 +105,15 @@ def initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off=False):
         derivative_last = (function_for_splining(n, l, np.array([a])) - function_for_splining(n, l, np.array([a-delta/10.0]))) / (delta/10.0)
         return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
 
-    spline_points = rascaline.generate_splines(
-        function_for_splining,
-        function_for_splining_derivative,
-        n_max,
-        l_max,
-        a,
-        requested_accuracy = 1e-8
+    spliner = rascaline.utils.RadialIntegralFromFunction(
+        radial_integral=function_for_splining,
+        radial_integral_derivative=function_for_splining_derivative,
+        max_radial=n_max,
+        max_angular=l_max,
+        spline_cutoff=a,
+        accuracy=1e-6,
     )
-    print("Number of spline points:", len(spline_points))
+    spline_points = spliner.compute()
 
     return n_max, l_max, E_nl, spline_points
 
@@ -125,7 +125,7 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
             "max_radial": int(n_max),
             "max_angular": int(l_max),
             "center_atom_weight": 0.0,
-            "radial_basis": {"TabulatedRadialIntegral": {"points": spline_points}},
+            "radial_basis": spline_points,
             "atomic_gaussian_width": 100.0,
         }
     
@@ -167,15 +167,15 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
 
         spherical_expansion_coefficients = calculator.compute(structures)
 
-        block_C_0 = spherical_expansion_coefficients.block(species_center = 6, spherical_harmonics_l = 0, species_neighbor = 1)
+        block_C_0 = spherical_expansion_coefficients.block(center_type = 6, spherical_harmonics_l = 0, neighbor_type = 1)
         # print(block_C_0.values.shape)
 
         block_C_0_0 = block_C_0.values[:, :, 0].flatten()
         spherical_harmonics_0 = 1.0/np.sqrt(4.0*np.pi)
 
-        all_species = np.unique(spherical_expansion_coefficients.keys["species_center"])
+        all_species = np.unique(spherical_expansion_coefficients.keys["center_type"])
         all_neighbor_species = Labels(
-                names=["species_neighbor"],
+                names=["neighbor_type"],
                 values=np.array(all_species, dtype=np.int32).reshape(-1, 1),
             )
         spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)

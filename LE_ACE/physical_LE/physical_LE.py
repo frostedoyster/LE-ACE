@@ -79,15 +79,15 @@ def initialize_physical_LE(r_cut, rs, E_max, r_0, rnn, cost_trade_off):
             ret += (eigenvectors[l][m, n]*dc(m, r, a) if l%2 == 0 else eigenvectors[l][m, n]*ds(m, r, a))
         return ret
 
-    spline_points = rascaline.generate_splines(
-        function_for_splining,
-        function_for_splining_derivative,
-        n_max,
-        l_max,
-        r_cut,
-        requested_accuracy = 1e-8
+    spliner = rascaline.utils.RadialIntegralFromFunction(
+        radial_integral=function_for_splining,
+        radial_integral_derivative=function_for_splining_derivative,
+        max_radial=n_max,
+        max_angular=l_max,
+        spline_cutoff=a,
+        accuracy=1e-6,
     )
-    print("Number of spline points:", len(spline_points))
+    spline_points = spliner.compute()
 
     """
     import matplotlib.pyplot as plt

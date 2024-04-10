@@ -15,7 +15,7 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
         # BUG: if the LE threshold is very low and only a l = 0 block is present, the l key will not appear, 
         # the l index below will take the the value of the first a_i and the code will most likely crash due to shape mismatches
 
-        l = idx[0]
+        l = idx["o3_lambda"]
         counter = 0
         for n in block.properties["n"]:
             if E_nl[n, l] <= E_max: counter += 1
@@ -28,11 +28,11 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
             if E_nl[n, l] <= E_max: 
                 LE_values[:, :, counter_LE] = block.values[:, :, counter_total]
                 if do_gradients: LE_gradients[:, :, :, counter_LE] = block.gradient("positions").values[:, :, :, counter_total]
-                labels_LE.append([species_remapping[int(block.properties["species_neighbor"][counter_total])], n, l, l])
+                labels_LE.append([species_remapping[int(block.properties["neighbor_type"][counter_total])], n, l, l])
                 counter_LE += 1
             counter_total += 1
         LE_block = TensorBlock(
-            values=LE_values.to(device),
+            values=LE_values,
             samples=block.samples,
             components=block.components,
             properties=Labels(
@@ -43,7 +43,7 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
         if do_gradients: LE_block.add_gradient(
             parameter="positions",
             gradient=TensorBlock(
-                values = LE_gradients.to(device), 
+                values = LE_gradients, 
                 samples = block.gradient("positions").samples, 
                 components = block.gradient("positions").components,
                 properties=LE_block.properties
@@ -53,10 +53,10 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
     return TensorMap(
             keys = Labels(
                 names = ("lam", "a_i"),
-                values = map.keys.values,
+                values = map.keys.values[:, [0, 2]],  # dropping sigma key
             ),
             blocks = LE_blocks
-        )
+        ).to(device=device)
 
 
 def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMap:
@@ -69,8 +69,8 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMa
         species_remapping[species] = i_species
 
     LE_blocks = []
-    for species_center in all_species:  # TODO: do not rely on all_species, which is used for the neighbors but some may be missing from the centers
-        block = map.block({"species_center": species_center})
+    for center_type in all_species:  # TODO: do not rely on all_species, which is used for the neighbors but some may be missing from the centers
+        block = map.block({"center_type": center_type})
         l = 0
         counter = 0
         for n in block.properties["n"]:
@@ -84,7 +84,7 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species) -> TensorMa
             if E_n[n] <= E_max: 
                 LE_values[:, counter_LE] = block.values[:, counter_total]
                 if do_gradients: LE_gradients[:, :, counter_LE] = block.gradient("positions").values[:, :, counter_total]
-                labels_LE.append([species_remapping[int(block.properties["species_neighbor"][counter_total])], n, l, l])
+                labels_LE.append([species_remapping[int(block.properties["neighbor_type"][counter_total])], n, l, l])
                 counter_LE += 1
             counter_total += 1
         LE_block = TensorBlock(
@@ -122,7 +122,7 @@ def get_LE_expansion(structures, calculator, E_nl, E_max, all_species, rs=False,
     spherical_expansion_coefficients = calculator.compute(structures, gradients=gradients)
 
     all_neighbor_species = Labels(
-            names=["species_neighbor"],
+            names=["neighbor_type"],
             values=torch.tensor(all_species).reshape(-1, 1),
         )
     spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)

@@ -143,7 +143,7 @@ class LE_ACE(torch.nn.Module):
         )
         self.properties_per_structure = [Labels.range("property", len(LE_energies)) for LE_energies in self.extended_LE_energies]
 
-        self.nu0_calculator_train = rascaline.torch.AtomicComposition(per_structure=False)
+        self.nu0_calculator_train = rascaline.torch.AtomicComposition(per_system=False)
         self.radial_spectrum_calculator_train = radial_spectrum_calculator
         self.spherical_expansion_calculator_train = spherical_expansion_calculator
         self.ace_calculator = ACECalculator(l_max, self.combine_indices, self.multiplicities, self.generalized_cgs)
@@ -159,7 +159,7 @@ class LE_ACE(torch.nn.Module):
         n_structures = len(structures)
 
         composition_features_tmap = self.nu0_calculator_train.compute(structures)
-        composition_features_tmap = composition_features_tmap.keys_to_samples("species_center")
+        composition_features_tmap = composition_features_tmap.keys_to_samples("center_type")
 
         if self.is_trace:
             radial_spectrum_tmap = get_TRACE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, self.trace_comb, rs=True, device=self.device)
@@ -231,7 +231,7 @@ class LE_ACE(torch.nn.Module):
         gradients = ["positions"]
 
         composition_features_tmap = self.nu0_calculator_train.compute(structures, gradients=gradients)
-        composition_features_tmap = composition_features_tmap.keys_to_samples("species_center")
+        composition_features_tmap = composition_features_tmap.keys_to_samples("center_type")
 
         if self.is_trace:
             radial_spectrum_tmap = get_TRACE_expansion(structures, self.radial_spectrum_calculator_train, self.E_n0, self.E_max[1], self.all_species, self.trace_comb, rs=True, do_gradients=True, device=self.device)
