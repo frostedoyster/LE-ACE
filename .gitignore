@@ -17,3 +17,5 @@ test*
 *profile*
 *egg-info*
 build/
+sh/
+json/

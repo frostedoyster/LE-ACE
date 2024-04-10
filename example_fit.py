@@ -12,23 +12,31 @@ r_cut = 6.0
 r_cut_rs = 6.0
 le_type = "physical"
 factor = 2.0
-E_max = [-1, 3000.0, 600.0, 300.0]
+E_max = [-1, 3000.0, 600.0]
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Training options:
 do_gradients = True
 opt_target_name = "rmse"
 target_key = "free_energy"
-force_weight = 0.1
+force_weight = 1.0
 batch_size = 100
+
+monomer = ase.io.read("datasets/Si_isolated_atom_DFT.xyz", ":")
+dimers = ase.io.read("datasets/Si_dimers_DFT.xyz", ":")
+e2 = [dimer.info["free_energy"] for dimer in dimers]
+
+e2 = e2 - 2*monomer[0].info["free_energy"]
+print(e2)
+
+exit()
 
 train_structures = (
     ase.io.read("datasets/Si_isolated_atom_DFT.xyz", ":") +
     ase.io.read("datasets/Si_dimers_DFT.xyz", ":") +
-    ase.io.read("datasets/Si_trimers_DFT.xyz", ":") +
-    ase.io.read("datasets/Si_tetramers_DFT.xyz", ":")
+    ase.io.read("datasets/Si_trimers_DFT.xyz", ":")
 )
-test_structures = ase.io.read("datasets/Si_pentamers_DFT.xyz", ":")
+test_structures = ase.io.read("datasets/Si_tetramers_DFT.xyz", ":")
 
 all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
 
