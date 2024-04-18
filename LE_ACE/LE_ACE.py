@@ -150,7 +150,7 @@ class LE_ACE(torch.nn.Module):
 
         self.prediction_coefficients = None  # to be set during training
 
-    def compute_features(self, structures):
+    def compute_features(self, structures, per_atom=False):
 
         # transform if not already done
         if not isinstance(structures[0], torch.ScriptObject):
@@ -189,34 +189,35 @@ class LE_ACE(torch.nn.Module):
                 torch.concatenate(features_nu).T
             )
 
-        # Sum over like-atoms in each structure:
-
-        sum_indices_comp = self.n_species*comp_metadata[:, 0]+self.species_to_species_index[comp_metadata[:, 2]]
-        sum_indices_rs = self.n_species*rs_metadata[:, 0]+self.species_to_species_index[rs_metadata[:, 2]]
-        sum_indices_spex = self.n_species*spex_metadata[:, 0]+self.species_to_species_index[spex_metadata[:, 2]]
-        B_basis_per_structure = []
-        for nu in range(0, self.nu_max+1):
-            if nu == 0:
-                B_basis_per_structure_nu = torch.zeros(
-                    n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
-                ).index_add_(0, sum_indices_comp, B_basis_concatenated[nu])
-                B_basis_per_structure_nu = B_basis_per_structure_nu.reshape(n_structures, -1)
-                if self.fixed_stoichiometry:
-                    B_basis_per_structure_nu = B_basis_per_structure_nu.sum(dim=1)
-            elif nu == 1:
-                B_basis_per_structure_nu = torch.zeros(
-                    n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
-                ).index_add_(0, sum_indices_rs, B_basis_concatenated[nu])
-            else:
-                B_basis_per_structure_nu = torch.zeros(
-                    n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
-                ).index_add_(0, sum_indices_spex, B_basis_concatenated[nu])
-            B_basis_per_structure.append(
-                B_basis_per_structure_nu.reshape(n_structures, -1)
-            )
+        if not per_atom:
+            # sum over like-atoms in each structure:
+            sum_indices_comp = self.n_species*comp_metadata[:, 0]+self.species_to_species_index[comp_metadata[:, 2]]
+            sum_indices_rs = self.n_species*rs_metadata[:, 0]+self.species_to_species_index[rs_metadata[:, 2]]
+            sum_indices_spex = self.n_species*spex_metadata[:, 0]+self.species_to_species_index[spex_metadata[:, 2]]
+            B_basis_per_structure = []
+            for nu in range(0, self.nu_max+1):
+                if nu == 0:
+                    B_basis_per_structure_nu = torch.zeros(
+                        n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
+                    ).index_add_(0, sum_indices_comp, B_basis_concatenated[nu])
+                    B_basis_per_structure_nu = B_basis_per_structure_nu.reshape(n_structures, -1)
+                    if self.fixed_stoichiometry:
+                        B_basis_per_structure_nu = B_basis_per_structure_nu.sum(dim=1)
+                elif nu == 1:
+                    B_basis_per_structure_nu = torch.zeros(
+                        n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
+                    ).index_add_(0, sum_indices_rs, B_basis_concatenated[nu])
+                else:
+                    B_basis_per_structure_nu = torch.zeros(
+                        n_structures*self.n_species, B_basis_concatenated[nu].shape[1], dtype=torch.get_default_dtype(), device=self.device
+                    ).index_add_(0, sum_indices_spex, B_basis_concatenated[nu])
+                B_basis_per_structure.append(
+                    B_basis_per_structure_nu.reshape(n_structures, -1)
+                )
+            B_basis_concatenated = B_basis_per_structure
         
         # Concatenate different body-orders:
-        B_basis_all_together = torch.concatenate([B_basis_per_structure[nu] for nu in range(0, self.nu_max+1)], dim=1)
+        B_basis_all_together = torch.concatenate([B_basis_concatenated[nu] for nu in range(0, self.nu_max+1)], dim=1)
 
         return B_basis_all_together
 
