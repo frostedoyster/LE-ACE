@@ -21,5 +21,8 @@ class Solver(torch.nn.Module):
 
         LE_reg = (10**self.alpha)*LE_reg
 
-        c = torch.linalg.solve(symm + torch.diag(LE_reg), vec)
+        try:
+            c = torch.linalg.solve(symm + torch.diag(LE_reg), vec)
+        except torch._C._LinAlgError:
+            c = torch.zeros_like(vec)
         return c

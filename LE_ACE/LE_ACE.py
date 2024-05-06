@@ -526,6 +526,9 @@ class LE_ACE(torch.nn.Module):
             if do_gradients:
                 test_rmse_forces = get_rmse(force_predictions, force_targets).item()
                 test_mae_forces = get_mae(force_predictions, force_targets).item()
+            else:
+                test_rmse_forces = None
+                test_mae_forces = None
 
             print(f"Test set RMSE (E): {test_rmse_energies} [MAE (E): {test_mae_energies}], RMSE (F): {test_rmse_forces} [MAE (F): {test_mae_forces}]")
 
