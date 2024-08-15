@@ -63,9 +63,6 @@ class ACEEvaluator(torch.nn.Module):
         )
         high_order_energies = []
         for nu in range(2, self.nu_max+1):
-            """if nu == 3: 
-                print(self.combine_indices[nu])
-                exit()"""
             high_order_energies.append(
                 polyeval(spherical_expansion, self.combine_indices[nu], self.multipliers[nu], spherical_expansion_species)
             )

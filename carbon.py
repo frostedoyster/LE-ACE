@@ -12,22 +12,21 @@ r_cut = 6.0
 r_cut_rs = 6.0
 le_type = "physical"
 factor = 1.5
-E_max = [-1, 1500.0, 250.0, 150.0, 100.0]
+E_max = [-1, 2000.0, 350.0, 220.0]
 device = "cuda" if torch.cuda.is_available() else "cpu"
-device = "cpu"
 
 # Training options:
 do_gradients = True
 opt_target_name = "rmse"
 target_key = "energy"
-force_weight = 1.0
-batch_size = 1
+force_weight = 0.1
+batch_size = 2
 
 all_structures = ase.io.read("datasets/C_dataset.xyz", ":")
 np.random.shuffle(all_structures)
 
-train_structures = all_structures[:1000]
-test_structures = all_structures[1000:2000]
+train_structures = all_structures[1000:2000]
+test_structures = all_structures[:1000]
 
 all_species = np.sort(np.unique(np.concatenate([train_structure.numbers for train_structure in train_structures] + [test_structure.numbers for test_structure in test_structures])))
 
@@ -69,15 +68,37 @@ if do_gradients:
     print("Test MAE forces:", accuracy_dict["test MAE forces"])
 
 
-"""
-# Semi-fast evaluator:
-le_ace_predictor = le_ace.get_fast_evaluator()
-
-import time
-n_test = len(test_structures)
-start_time = time.time()
+test_structures_by_category = {
+    'sp2 bonded': [],
+    'sp3 bonded': [],
+    'amorphous/liquid': [],
+    'general bulk': [],
+    'general clusters': [],
+}
 for test_structure in test_structures:
-    le_ace.predict([test_structure], do_positions_grad=True)
-finish_time = time.time()
-print(f"Evaluation took {(finish_time-start_time)/n_test} per structure")
-"""
+    category = test_structure.info['category']
+    test_structures_by_category[category].append(test_structure)
+
+
+for category, structures in test_structures_by_category.items():
+
+    print()
+    print("Results for category", category)
+
+    sse_e = 0.0
+    sse_f = 0.0
+    n_e = 0
+    n_f = 0
+
+    for structure in structures:
+        predictions = le_ace.predict([structure], do_positions_grad=True)
+        e, f = predictions["values"], -predictions["positions gradient"]
+        true_e = structure.info["energy"]
+        true_f = structure.arrays["forces"]
+        sse_e += (e.item()/len(structure)-true_e/len(structure))**2
+        n_e += 1
+        sse_f += np.sum((f.clone().detach().cpu().numpy() - true_f)**2)
+        n_f += 3* len(structure)
+
+    print("Energy RMSE", np.sqrt(sse_e/n_e))
+    print("Force RMSE", np.sqrt(sse_f/n_f))

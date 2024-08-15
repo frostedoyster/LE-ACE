@@ -89,15 +89,13 @@ def initialize_physical_LE(r_cut, rs, E_max, r_0, rnn, cost_trade_off):
     )
     spline_points = spliner.compute()
 
-    """
-    import matplotlib.pyplot as plt
-    r = np.linspace(0.1, r_cut-0.001, 1000)
-    plt.plot(r, function_for_splining(0, 0, r), label=str(rs))
-    plt.plot([0.0, r_cut], [0.0, 0.0], "black")
-    plt.xlim(0.0, r_cut)
-    plt.legend()
-    plt.savefig("radial-real.pdf")
-    """
+    # import matplotlib.pyplot as plt
+    # r = np.linspace(0.1, r_cut-0.001, 1000)
+    # plt.plot(r, function_for_splining(1, 1, r), label=str(rs))
+    # plt.plot([0.0, r_cut], [0.0, 0.0], "black")
+    # plt.xlim(0.0, r_cut)
+    # plt.legend()
+    # plt.savefig("radial-real.pdf")
 
     if rs: E_nl = E_ln[0]  # E_n0 as a 1D array
 

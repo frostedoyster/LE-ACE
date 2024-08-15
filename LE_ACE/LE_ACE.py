@@ -7,13 +7,14 @@ from .LE_initialization import initialize_basis
 from .LE_metadata import get_le_metadata
 from .generalized_cgs import get_generalized_cgs
 from .ACE_calculator import ACECalculator
-from .solver import Solver
 from .structures import transform_structures
 from .ACE_evaluator import ACEEvaluator
 
 from .LE_expansion import get_LE_expansion
 from .TRACE_expansion import get_TRACE_expansion
 from .error_measures import get_rmse, get_mae, get_sae, get_sse
+
+from scipy.optimize import brute
 
 
 class LE_ACE(torch.nn.Module):
@@ -384,8 +385,11 @@ class LE_ACE(torch.nn.Module):
         for i_batch, batch in enumerate(train_structures):
             print(f"DOING TRAIN BATCH {i_batch+1} out of {len(train_structures)}")
             energies = torch.tensor([structure.info[target_key] for structure in batch], dtype=torch.get_default_dtype(), device=self.device)
+            n_atoms = torch.tensor([len(s) for s in batch], device=self.device)
             if do_gradients:
                 values, gradients = self.compute_features_with_gradients(batch)
+                values = values / n_atoms.unsqueeze(1)
+                energies = energies / n_atoms
                 gradients = -force_weight*gradients.reshape(gradients.shape[0]*3, values.shape[1])
                 symm += values.T @ values
                 symm += gradients.T @ gradients
@@ -400,26 +404,28 @@ class LE_ACE(torch.nn.Module):
         print("Features done. Beginning linear fit optimization")
         print("Total number of features: ", n_feat)
 
-        alpha_start = -10.0
-        beta_start = 0.0
+        def function_to_minimize(alpha_and_beta):
+            alpha, beta = alpha_and_beta[0], alpha_and_beta[1]
 
-        solver = Solver(n_feat, self.extended_LE_energies, alpha_start, beta_start, self.nu_max).to(self.device)
-        optimizer = torch.optim.LBFGS(solver.parameters(), max_iter=5)
-
-        loss_list = []
-        alpha_list = []
-        beta_list = []
-
-        def closure():
-            optimizer.zero_grad()
-            # batched LBFGS
-            total_loss = 0.0
+            LE_reg = [tensor.clone() for tensor in self.extended_LE_energies]
+            for nu in range(self.nu_max+1):
+                LE_reg[nu] *= np.exp(beta*nu)
+            LE_reg = torch.concatenate(LE_reg)
+            assert LE_reg.shape[0] == symm.shape[0]
+            LE_reg = (10.0**alpha)*LE_reg
+            try:
+                c = torch.linalg.solve(symm + torch.diag(LE_reg), vec)
+            except:
+                return np.inf
+            total_loss = 0
             for batch in validation_structures:
-                c = solver(symm, vec)
                 self.prediction_coefficients = c
-                predictions_dict = self.predict(batch, do_positions_grad=do_gradients, is_training=True)
+                predictions_dict = self.predict(batch, do_positions_grad=do_gradients, is_training=False)
                 validation_predictions = predictions_dict["values"]
+                n_atoms = torch.tensor([len(s) for s in batch], device=validation_predictions.device)
                 validation_targets = torch.tensor([structure.info[target_key] for structure in batch], dtype=torch.get_default_dtype(), device=self.device)
+                validation_predictions = validation_predictions / n_atoms
+                validation_targets = validation_targets / n_atoms
                 if do_gradients:
                     validation_predictions_forces = -predictions_dict["positions gradient"].reshape(-1)*force_weight
                     validation_targets_forces = torch.tensor(np.concatenate([structure.get_forces().reshape(-1) for structure in batch], axis = 0), dtype=torch.get_default_dtype(), device=self.device)*force_weight
@@ -432,23 +438,14 @@ class LE_ACE(torch.nn.Module):
                     loss = get_sse(validation_predictions, validation_targets)
 
                 total_loss += loss.item()
-                loss.backward()
-            
-            print(f"alpha={solver.alpha.item()} beta={solver.beta.item()} loss={total_loss}")
-            loss_list.append(total_loss)
-            alpha_list.append(solver.alpha.item())
-            beta_list.append(solver.beta.item())
-
+                
+            print(f"alpha={alpha} beta={beta} loss={total_loss}")
             return total_loss
 
-        n_cycles = 4
-        for i_cycle in range(n_cycles):
-            _ = optimizer.step(closure)
-            print(f"Finished step {i_cycle+1} out of {n_cycles}")
+        result = brute(function_to_minimize, (slice(-15, 1, 1), slice(-4, 5, 2)), finish=None)
 
-        where_best_loss = np.argmin(np.nan_to_num(loss_list, nan=1e100))
-        best_alpha = alpha_list[where_best_loss]
-        best_beta = beta_list[where_best_loss]
+        best_alpha = result[0]
+        best_beta = result[1]
         print("Best parameters:", best_alpha, best_beta)
 
         LE_reg = [tensor.clone() for tensor in self.extended_LE_energies]
@@ -469,8 +466,9 @@ class LE_ACE(torch.nn.Module):
             force_targets = []
         for batch in validation_structures:
             predict_dict = self.predict(batch, do_positions_grad=do_gradients)
-            energy_predictions.append(predict_dict["values"])
-            energy_targets.append(torch.tensor([structure.info[target_key] for structure in batch], dtype=torch.get_default_dtype(), device=self.device))
+            n_atoms = torch.tensor([len(s) for s in batch], device=self.device)
+            energy_predictions.append(predict_dict["values"]/n_atoms)
+            energy_targets.append(torch.tensor([structure.info[target_key] for structure in batch], dtype=torch.get_default_dtype(), device=self.device)/n_atoms)
             if do_gradients:
                 force_predictions.append(-predict_dict["positions gradient"])
                 force_targets.append(torch.tensor(np.concatenate([structure.get_forces() for structure in batch], axis = 0), dtype=torch.get_default_dtype(), device=self.device))
@@ -509,8 +507,9 @@ class LE_ACE(torch.nn.Module):
                 force_targets = []
             for batch in test_structures:
                 predict_dict = self.predict(batch, do_positions_grad=do_gradients)
-                energy_predictions.append(predict_dict["values"])
-                energy_targets.append(torch.tensor([structure.info[target_key] for structure in batch], dtype=torch.get_default_dtype(), device=self.device))
+                n_atoms = torch.tensor([len(s) for s in batch], device=self.device)
+                energy_predictions.append(predict_dict["values"]/n_atoms)
+                energy_targets.append(torch.tensor([structure.info[target_key] for structure in batch], dtype=torch.get_default_dtype(), device=self.device)/n_atoms)
                 if do_gradients:
                     force_predictions.append(-predict_dict["positions gradient"])
                     force_targets.append(torch.tensor(np.concatenate([structure.get_forces() for structure in batch], axis = 0), dtype=torch.get_default_dtype(), device=self.device))
@@ -525,6 +524,8 @@ class LE_ACE(torch.nn.Module):
             if do_gradients:
                 test_rmse_forces = get_rmse(force_predictions, force_targets).item()
                 test_mae_forces = get_mae(force_predictions, force_targets).item()
+            else:
+                test_rmse_forces, test_mae_forces = None, None
 
             print(f"Test set RMSE (E): {test_rmse_energies} [MAE (E): {test_mae_energies}], RMSE (F): {test_rmse_forces} [MAE (F): {test_mae_forces}]")
 
@@ -631,10 +632,10 @@ class LE_ACE(torch.nn.Module):
             for ai_index in range(self.n_species):
                 multipliers_nu_ai = []
                 for index_l_tuple_nu, l_tuple_nu in enumerate(self.fixed_order_l_tuples[nu]):
-                    C = self.generalized_cgs[(0, 1)][nu][l_tuple_nu]  # m, L_tuple
-                    c = split_coefficients[nu][ai_index][index_l_tuple_nu]  # L_tuple, b
-                    m = self.multiplicities[nu][l_tuple_nu]  # b
-                    multipliers_l_tuple = (C.T @ c.reshape(C.shape[0], m.shape[0])) * m.unsqueeze(0)
+                    C = self.generalized_cgs[(0, 1)][nu][l_tuple_nu].cpu()  # m, L_tuple
+                    c = split_coefficients[nu][ai_index][index_l_tuple_nu].cpu()  # L_tuple, b
+                    m = self.multiplicities[nu][l_tuple_nu].cpu()  # b
+                    multipliers_l_tuple = (C.to_dense().T @ c.reshape(C.shape[0], m.shape[0])) * m.unsqueeze(0)
                     multipliers_nu_ai.append(multipliers_l_tuple.flatten())  # m_tuple, b
                 multipliers_nu_ai = torch.concatenate(multipliers_nu_ai)
                 multipliers_nu.append(multipliers_nu_ai)
@@ -668,7 +669,7 @@ class LE_ACE(torch.nn.Module):
                         dim=1
                     )
                 m_tuples = torch.repeat_interleave(current_m_range, len(combine_indices_nu1[nu][index_l_tuple_nu]), dim=0)
-                b_1 = combine_indices_nu1[nu][index_l_tuple_nu].repeat((len(current_m_range), 1))
+                b_1 = combine_indices_nu1[nu][index_l_tuple_nu].repeat((len(current_m_range), 1)).cpu()
                 assert m_tuples.shape == b_1.shape
                 final_combine_indices_l_tuple_nu = torch.empty_like(b_1)
                 for iota in range(nu):
