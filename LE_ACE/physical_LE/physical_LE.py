@@ -70,13 +70,13 @@ def initialize_physical_LE(r_cut, rs, E_max, r_0, rnn, cost_trade_off):
     def function_for_splining(n, l, r):
         ret = np.zeros_like(r)
         for m in range(n_max_big):
-            ret += (eigenvectors[l][m, n]*c(m, r, a) if l%2 == 0 else eigenvectors[l][m, n]*s(m, r, a))
+            ret += (eigenvectors[l][m, n]*c(m, r, a) if l == 0 else eigenvectors[l][m, n]*s(m, r, a))
         return ret
 
     def function_for_splining_derivative(n, l, r):
         ret = np.zeros_like(r)
         for m in range(n_max_big):
-            ret += (eigenvectors[l][m, n]*dc(m, r, a) if l%2 == 0 else eigenvectors[l][m, n]*ds(m, r, a))
+            ret += (eigenvectors[l][m, n]*dc(m, r, a) if l == 0 else eigenvectors[l][m, n]*ds(m, r, a))
         return ret
 
     spliner = rascaline.utils.RadialIntegralFromFunction(
