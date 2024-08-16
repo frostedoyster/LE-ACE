@@ -11,8 +11,8 @@ torch.set_default_dtype(torch.float64)
 r_cut = 6.0
 r_cut_rs = 6.0
 le_type = "physical"
-factor = 1.5
-E_max = [-1, 2000.0, 350.0, 220.0]
+factor = 2.0
+E_max = [-1, 2000.0, 350.0, 220.0, 50.0]
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Training options:
