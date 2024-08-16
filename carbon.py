@@ -20,7 +20,7 @@ do_gradients = True
 opt_target_name = "rmse"
 target_key = "energy"
 force_weight = 0.1
-batch_size = 2
+batch_size = 5
 
 all_structures = ase.io.read("datasets/C_dataset.xyz", ":")
 np.random.shuffle(all_structures)

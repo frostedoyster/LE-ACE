@@ -12,7 +12,7 @@ from scipy.special import spherical_yn as y_l
 from .spherical_bessel_zeros import Jn_zeros, get_laplacian_eigenvalues
 from scipy.integrate import quadrature
 
-from .physical_LE import initialize_physical_LE
+from .physical_basis import initialize_physical_basis
 from .LE_cutoff import get_LE_cutoff
 
 
@@ -22,7 +22,7 @@ def initialize_basis(a, rs, E_max, le_type, r0, rnn, cost_trade_off=False):
     if le_type == "pure" or le_type == "paper" or le_type == "transform":
         n_max, l_max, E_nl, splines = initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off)
     elif le_type == "physical":
-        n_max, l_max, E_nl, splines = initialize_physical_LE(a, rs, E_max, r0, rnn, cost_trade_off)
+        n_max, l_max, E_nl, splines = initialize_physical_basis(a, rs, E_max, r0, rnn, cost_trade_off)
     else:
         raise NotImplementedError("LE type can only be pure, paper, transform, and physical")
 

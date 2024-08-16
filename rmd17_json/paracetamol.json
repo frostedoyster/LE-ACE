@@ -1,0 +1,23 @@
+{
+    "batch size": 10,
+    "energy conversion": "KCAL_MOL_TO_MEV",
+    "force conversion": "KCAL_MOL_TO_MEV",
+    "target key": "energy",
+    "dataset path": "datasets/rmd17/paracetamol1.extxyz",
+    "n_test": 200,
+    "do gradients": true, 
+    "force weight": 0.03,
+    "r_cut": 6.0, 
+    "r_cut_rs": 6.0,
+    "nu_max": 3,
+    "E_max coefficients" : [1e+30, 2000.0, 250.0, 150.0],
+    "optimization target": "mae",
+    "factor for radial transform": 1.5,
+    "cost_trade_off": false,
+    "le_type": "physical",
+    "dataset_style": "MD",
+    "is_trace": false,
+    "n_trace": 2,
+    "inner_smoothing": false
+}
+
