@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "LE-ACE"
+version = "0.1"
+dependencies = [
+    "numpy",
+    "torch",
+    "scipy==1.14.0",
+    "featomic-torch",
+    "ase",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["*"]

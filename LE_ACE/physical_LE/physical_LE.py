@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-import rascaline
+import featomic
 
 from ..LE_cutoff import get_LE_cutoff
 
@@ -63,9 +63,8 @@ def initialize_physical_LE(r_cut, rs, E_max, r_0, rnn, cost_trade_off):
     )
 
     E_nl = E_ln.T
-    if rs:
-        E_n0 = E_nl[:, 0]
-    n_max, l_max = get_LE_cutoff(E_nl, E_max, rs)
+    n_max_l = get_LE_cutoff(E_nl, E_max, rs)
+    l_max = len(n_max_l) - 1
 
     def function_for_splining(n, l, r):
         ret = np.zeros_like(r)
@@ -78,16 +77,39 @@ def initialize_physical_LE(r_cut, rs, E_max, r_0, rnn, cost_trade_off):
         for m in range(n_max_big):
             ret += (eigenvectors[l][m, n]*dc(m, r, a) if l == 0 else eigenvectors[l][m, n]*ds(m, r, a))
         return ret
+    
+    radial_basis = {}
+    for l in range(l_max+1):
 
-    spliner = rascaline.utils.RadialIntegralFromFunction(
-        radial_integral=function_for_splining,
-        radial_integral_derivative=function_for_splining_derivative,
-        max_radial=n_max,
-        max_angular=l_max,
-        spline_cutoff=a,
-        accuracy=1e-6,
-    )
-    spline_points = spliner.compute()
+        def values_fn(r):
+            stacked = []
+            for n in range(n_max_l[l]):
+                stacked.append(function_for_splining(n, l, r))
+            return np.stack(stacked).T
+
+        def derivatives_fn(r):
+            stacked = []
+            for n in range(n_max_l[l]):
+                stacked.append(function_for_splining_derivative(n, l, r))
+            return np.stack(stacked).T
+
+        spline = featomic.splines.Spline.with_accuracy(
+            start=0.0,
+            stop=a,
+            values_fn=values_fn,
+            derivatives_fn=derivatives_fn,
+            accuracy=1e-8,
+        )
+
+        class CustomRadialBasis(featomic.splines.SplinedRadialBasis):
+            def _get_orthonormalization_matrix(self) -> np.ndarray:
+                return np.eye(self.size)
+            
+        radial_basis[l] = CustomRadialBasis(
+            spline=spline,
+            max_radial=n_max_l[l]-1,  # new featomic convention
+            radius=r_cut,
+        )
 
     """
     import matplotlib.pyplot as plt
@@ -101,4 +123,4 @@ def initialize_physical_LE(r_cut, rs, E_max, r_0, rnn, cost_trade_off):
 
     if rs: E_nl = E_ln[0]  # E_n0 as a 1D array
 
-    return n_max, l_max, E_nl, spline_points
+    return n_max, l_max, E_nl, radial_basis

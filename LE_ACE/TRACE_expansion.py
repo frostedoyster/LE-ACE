@@ -31,8 +31,8 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
             counter_total += 1
         TRACE_block = TensorBlock(
             values=TRACE_values.to(device),
-            samples=block.samples,
-            components=block.components,
+            samples=block.samples.to(device),
+            components=[c.to(device) for c in block.components],
             properties=Labels(
                 names = ("a1", "n1", "l1", "k1"),
                 values = torch.tensor(labels_TRACE, device=device),
@@ -51,7 +51,7 @@ def process_spherical_expansion(map: TensorMap, E_nl, E_max, all_species, device
     return TensorMap(
             keys = Labels(
                 names = ("lam", "a_i"),
-                values = map.keys.values,
+                values = map.keys.values[:, [0, 2]].to(device),  # dropping sigma key
             ),
             blocks = TRACE_blocks
         )
@@ -87,8 +87,8 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species, device) -> 
             counter_total += 1
         TRACE_block = TensorBlock(
             values=TRACE_values.to(device),
-            samples=block.samples,
-            components=block.components,
+            samples=block.samples.to(device),
+            components=[c.to(device) for c in block.components],
             properties=Labels(
                 names = ("a1", "n1", "l1", "k1"),
                 values = torch.tensor(labels_TRACE, device=device),
@@ -108,7 +108,7 @@ def process_radial_spectrum(map: TensorMap, E_n, E_max, all_species, device) -> 
     return TensorMap(
             keys = Labels(
                 names = ("a_i",),
-                values = map.keys.values,
+                values = map.keys.values.to(device),
             ),
             blocks = TRACE_blocks
         )
@@ -122,9 +122,9 @@ def get_TRACE_expansion(structures, calculator, E_nl, E_max, all_species, contra
     spherical_expansion_coefficients = calculator.compute(structures, gradients=gradients)
 
     all_neighbor_species = Labels(
-            names=["neighbor_type"],
-            values=torch.tensor(all_species, device=device).reshape(-1, 1),
-        )
+        names=["neighbor_type"],
+        values=torch.tensor(all_species, device=device).reshape(-1, 1),
+    )
         
     spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
 

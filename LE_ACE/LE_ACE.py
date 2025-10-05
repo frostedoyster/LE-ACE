@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-import rascaline.torch
+import featomic.torch
 from metatensor.torch import Labels
 
 from .LE_initialization import initialize_basis
@@ -63,7 +63,7 @@ class LE_ACE(torch.nn.Module):
         E_ln = self.E_nl.T
         self.n_max_l = []
         for l in range(l_max+1):
-            self.n_max_l.append(np.where(self.E_nl[:, l] <= E_max[2])[0][-1] + 1)
+            self.n_max_l.append(int(np.where(self.E_nl[:, l] <= E_max[2])[0][-1]) + 1)
         print("Radial spectrum:", self.n_max_rs)
         print("Spherical expansion", self.n_max_l)
         self.l_max = len(self.n_max_l) - 1
@@ -143,7 +143,7 @@ class LE_ACE(torch.nn.Module):
         )
         self.properties_per_structure = [Labels.range("property", len(LE_energies)) for LE_energies in self.extended_LE_energies]
 
-        self.nu0_calculator_train = rascaline.torch.AtomicComposition(per_system=False)
+        self.nu0_calculator_train = featomic.torch.AtomicComposition(per_system=False)
         self.radial_spectrum_calculator_train = radial_spectrum_calculator
         self.spherical_expansion_calculator_train = spherical_expansion_calculator
         self.ace_calculator = ACECalculator(l_max, self.combine_indices, self.multiplicities, self.generalized_cgs)

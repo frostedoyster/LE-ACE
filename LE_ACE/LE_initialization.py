@@ -1,8 +1,9 @@
 import numpy as np
 
-import rascaline
-import rascaline.torch
+import featomic
+import featomic.torch
 from metatensor.torch import Labels
+import torch
 
 import scipy as sp
 from scipy import optimize
@@ -39,7 +40,9 @@ def initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off=False):
     E_nl = get_laplacian_eigenvalues(n_big, l_big, cost_trade_off=cost_trade_off)
     if rs:
         E_nl = E_nl[:, 0]
-    n_max, l_max = get_LE_cutoff(E_nl, E_max, rs)
+    n_max_l = get_LE_cutoff(E_nl, E_max, rs)
+    l_max = len(n_max_l) - 1
+    n_max = n_max_l[0]
 
     z_ln = Jn_zeros(l_max, n_max)  # Spherical Bessel zeros
     z_nl = z_ln.T
@@ -105,46 +108,68 @@ def initialize_LE(a, rs, E_max, r0, rnn, le_type, cost_trade_off=False):
         derivative_last = (function_for_splining(n, l, np.array([a])) - function_for_splining(n, l, np.array([a-delta/10.0]))) / (delta/10.0)
         return np.concatenate([derivative_at_zero, all_derivatives_except_first_and_last, derivative_last])
 
-    spliner = rascaline.utils.RadialIntegralFromFunction(
-        radial_integral=function_for_splining,
-        radial_integral_derivative=function_for_splining_derivative,
-        max_radial=n_max,
-        max_angular=l_max,
-        spline_cutoff=a,
-        accuracy=1e-6,
-    )
-    spline_points = spliner.compute()
+    radial_basis = {}
+    for l in range(l_max+1):
 
-    return n_max, l_max, E_nl, spline_points
+        def values_fn(r):
+            stacked = []
+            for n in range(n_max_l[l]):
+                stacked.append(function_for_splining(n, l, r))
+            return np.stack(stacked).T
+
+        def derivatives_fn(r):
+            stacked = []
+            for n in range(n_max_l[l]):
+                stacked.append(function_for_splining_derivative(n, l, r))
+            return np.stack(stacked).T
+
+        spline = featomic.splines.Spline.with_accuracy(
+            start=0.0,
+            stop=a,
+            values_fn=values_fn,
+            derivatives_fn=derivatives_fn,
+            accuracy=1e-8,
+        )
+
+        class CustomRadialBasis(featomic.splines.SplinedRadialBasis):
+            def _get_orthonormalization_matrix(self) -> np.ndarray:
+                return np.eye(self.size)
+            
+        radial_basis[l] = CustomRadialBasis(
+            spline=spline,
+            max_radial=n_max_l[l]-1,  # new featomic convention
+            radius=a,
+        )
+    
+    return n_max, l_max, E_nl, radial_basis
 
 
-def get_calculator(a, n_max, l_max, le_type, spline_points):
-
-    hypers_spherical_expansion = {
-            "cutoff": a,
-            "max_radial": int(n_max),
-            "max_angular": int(l_max),
-            "center_atom_weight": 0.0,
-            "radial_basis": spline_points,
-            "atomic_gaussian_width": 100.0,
-        }
+def get_calculator(a, n_max, l_max, le_type, radial_basis):
     
     if le_type == "pure":
-        hypers_spherical_expansion["cutoff_function"] = {"ShiftedCosine": {"width": 1.0}}
+        smoothing = featomic.cutoff.ShiftedCosine(width=1.0)
     elif le_type == "paper":
-        hypers_spherical_expansion["cutoff_function"] = {"Step": {}}
+        smoothing = featomic.cutoff.Step()
     elif le_type == "transform":
-        hypers_spherical_expansion["cutoff_function"] = {"ShiftedCosine": {"width": 1.0}}
+        smoothing = featomic.cutoff.ShiftedCosine(width=1.0)
     elif le_type == "physical":
-        hypers_spherical_expansion["cutoff_function"] = {"ShiftedCosine": {"width": 1.0}}
+        smoothing = featomic.cutoff.ShiftedCosine(width=1.0)
     else:
         raise NotImplementedError("LE types can only be pure, paper, and radial_transform")
 
     if l_max == 0:
-        hypers_spherical_expansion.pop("max_angular")
-        calculator = rascaline.torch.SoapRadialSpectrum(**hypers_spherical_expansion)
+        calculator = featomic.torch.SoapRadialSpectrum(
+            cutoff=featomic.cutoff.Cutoff(radius=a, smoothing=smoothing),
+            density=featomic.density.DiracDelta(center_atom_weight=0.0),
+            basis={"radial": radial_basis[0], "spline_accuracy": 1e-8}
+        )
     else:
-        calculator = rascaline.torch.SphericalExpansion(**hypers_spherical_expansion)
+        spliner = featomic.splines.SoapSpliner(
+            cutoff=featomic.cutoff.Cutoff(radius=a, smoothing=smoothing),
+            density=featomic.density.DiracDelta(center_atom_weight=0.0),
+            basis=featomic.basis.Explicit(by_angular=radial_basis, spline_accuracy=1e-8)
+        )
+        calculator = featomic.torch.SphericalExpansion(**spliner.get_hypers())
 
 
     # Uncomment this to inspect the spherical expansion
@@ -156,18 +181,20 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
             dummy_structures = []
             for r in r_array:
                 dummy_structures.append(
-                    ase.Atoms('CH', positions=[(0, 0, 0), (0, 0, r)])
+                    featomic.torch.systems_to_torch(
+                        ase.Atoms('CH', positions=[(0, 0, 0), (0, 0, r)])
+                    )
                 )
             return dummy_structures 
 
-        # Create a fake list of dummy structures to test the radial functions generated from rascaline.torch.
+        # Create a fake list of dummy structures to test the radial functions generated from featomic.torch.
 
         r = np.linspace(0.1, a-0.001, 1000)
         structures = get_dummy_structures(r)
 
         spherical_expansion_coefficients = calculator.compute(structures)
 
-        block_C_0 = spherical_expansion_coefficients.block(center_type = 6, spherical_harmonics_l = 0, neighbor_type = 1)
+        block_C_0 = spherical_expansion_coefficients.block({"center_type": 6, "o3_lambda": 0, "neighbor_type": 1})
         # print(block_C_0.values.shape)
 
         block_C_0_0 = block_C_0.values[:, :, 0].flatten()
@@ -176,12 +203,12 @@ def get_calculator(a, n_max, l_max, le_type, spline_points):
         all_species = np.unique(spherical_expansion_coefficients.keys["center_type"])
         all_neighbor_species = Labels(
                 names=["neighbor_type"],
-                values=np.array(all_species, dtype=np.int32).reshape(-1, 1),
+                values=torch.tensor(all_species).reshape(-1, 1),
             )
         spherical_expansion_coefficients = spherical_expansion_coefficients.keys_to_properties(all_neighbor_species)
 
         import matplotlib.pyplot as plt
-        plt.plot(r, block_C_0_0/spherical_harmonics_0, label="rascaline.torch output")
+        plt.plot(r, block_C_0_0/spherical_harmonics_0, label="featomic.torch output")
         plt.plot([0.0, a], [0.0, 0.0], "black")
         plt.xlim(0.0, a)
         plt.legend()
